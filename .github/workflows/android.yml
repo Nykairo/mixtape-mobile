@@ -96,8 +96,11 @@ jobs:
         continue-on-error: true
         run: |
           cd android
-          ./gradlew :mixtape_native:testReleaseUnitTest --console=plain 2>&1 \
-            | grep -E "search:|resolve:|fetch:|PASSED|FAILED|Exception|BUILD" | head -40
+          ./gradlew projects --console=plain > projects.log 2>&1 || true
+          grep -E "Project ':" projects.log | head -20
+          ./gradlew :mixtape_native:testReleaseUnitTest --console=plain > youtube.log 2>&1 || true
+          grep -E "search:|resolve:|fetch:|PASSED|FAILED|BUILD" youtube.log | head -40
+          grep -A 15 "What went wrong" youtube.log | head -40
 
       - uses: actions/upload-artifact@v4
         with:
