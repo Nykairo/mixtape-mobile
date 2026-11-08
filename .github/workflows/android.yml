@@ -119,10 +119,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.name.outputs.version }}
         run: |
-          notes="Mixtape $VERSION for Android 7 and newer. Install Mixtape-$VERSION.apk; a phone from before 2017 or so may need Mixtape-$VERSION-older-phones.apk instead."
-          if gh release view "v$VERSION" >/dev/null 2>&1; then
-            gh release upload "v$VERSION" Mixtape-*.apk --clobber
-          else
-            gh release create "v$VERSION" Mixtape-*.apk --target "$GITHUB_SHA" \
-              --title "Mixtape $VERSION for Android" --notes "$notes"
-          fi
+          notes="Mixtape $VERSION for Android and the iPhone. Android 7 and newer: install Mixtape-$VERSION.apk (a phone from before 2017 or so may need Mixtape-$VERSION-older-phones.apk). iPhone: see the README."
+          # the iPhone build may be making the same release right now: whoever comes second adds to it
+          for attempt in 1 2 3 4 5; do
+            if gh release view "v$VERSION" >/dev/null 2>&1; then
+              gh release upload "v$VERSION" Mixtape-*.apk --clobber && exit 0
+            else
+              gh release create "v$VERSION" Mixtape-*.apk --target "$GITHUB_SHA" \
+                --title "Mixtape $VERSION" --notes "$notes" && exit 0
+            fi
+            sleep 20
+          done
+          exit 1
