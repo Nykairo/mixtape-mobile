@@ -4,11 +4,11 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:mixtape_native/mixtape_native.dart';
 
 import '../app.dart';
 import '../look.dart';
 import '../model.dart';
+import '../youtube.dart';
 import 'widgets.dart';
 
 class SearchPage extends StatefulWidget {
@@ -51,7 +51,7 @@ class _SearchPageState extends State<SearchPage> {
       _trouble = null;
     });
     try {
-      final got = await MixtapeNative.search(q);
+      final got = await YouTube.search(q);
       if (!mounted || _asked != q) return; // a newer search is on its way
       setState(() {
         _found = [for (final m in got) Track.fromYouTube(m)];

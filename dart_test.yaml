@@ -1,0 +1,3 @@
+tags:
+  # tests that ask the real YouTube; the build runs them on their own and only reports them
+  network:

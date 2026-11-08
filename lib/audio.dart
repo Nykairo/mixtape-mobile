@@ -19,6 +19,7 @@ import 'package:mixtape_native/mixtape_native.dart';
 
 import 'model.dart';
 import 'store.dart';
+import 'youtube.dart';
 
 const _sessionFile = 'session.json';
 
@@ -68,7 +69,7 @@ class Links {
 
   static Future<Link> _look(String id) async {
     try {
-      final m = await MixtapeNative.resolve(id);
+      final m = await YouTube.resolve(id);
       final link = Link(Uri.parse('${m['url']}'), '${m['agent'] ?? ''}', '${m['mime'] ?? 'audio/mp4'}',
           _int(m['length']), _int(m['expires']), _int(m['bitrate']));
       _links[id] = link;
