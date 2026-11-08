@@ -44,10 +44,11 @@ class _HomePageState extends State<HomePage> {
         for (final t in Links.related(last.ref))
           if (!have.contains(t.id)) t,
       ].take(12).toList();
+      final of = last.id;
       if (mounted) {
         setState(() {
           _like = like;
-          _likeOf = last.id;
+          _likeOf = of;
         });
       }
     } on Object {
