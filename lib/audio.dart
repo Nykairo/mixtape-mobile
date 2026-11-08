@@ -213,6 +213,51 @@ class YouTubeSource extends StreamAudioSource {
 
 // ---------------------------------------------------------------- the player
 
+/// The order shuffle plays the queue in. Unlike just_audio's own, songs that come in go where they were
+/// meant to: "Play next" right after the song that plays, "Add to queue" at the very end.
+class QueueOrder extends ShuffleOrder {
+  final _random = Random();
+
+  @override
+  final List<int> indices = [];
+
+  /// Set while "Play next" puts a song in: the song that plays now (its index in the queue).
+  int? after;
+
+  @override
+  void shuffle({int? initialIndex}) {
+    indices.shuffle(_random);
+    if (initialIndex != null && indices.remove(initialIndex)) indices.insert(0, initialIndex);
+  }
+
+  @override
+  void insert(int index, int count) {
+    for (var i = 0; i < indices.length; i++) {
+      if (indices[i] >= index) indices[i] += count;
+    }
+    final fresh = List.generate(count, (k) => index + k);
+    final now = after;
+    final at = now == null ? -1 : indices.indexOf(now >= index ? now + count : now);
+    if (at < 0) {
+      indices.addAll(fresh);
+    } else {
+      indices.insertAll(at + 1, fresh);
+    }
+  }
+
+  @override
+  void removeRange(int start, int end) {
+    final count = end - start;
+    indices.removeWhere((i) => i >= start && i < end);
+    for (var i = 0; i < indices.length; i++) {
+      if (indices[i] >= end) indices[i] -= count;
+    }
+  }
+
+  @override
+  void clear() => indices.clear();
+}
+
 /// What the app shows about the queue: the songs in the order they play, and which one plays.
 class QueueView {
   const QueueView(this.songs, this.index);
@@ -229,6 +274,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   }
 
   final _player = AudioPlayer(useProxyForRequestHeaders: false);
+  final _order = QueueOrder();
   final _client = http.Client();
   late final Future<void> _ready;
 
@@ -341,7 +387,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
     queue.add([for (final t in list) _item(t)]);
     try {
       await _player.setAudioSources([for (final t in list) _source(t)],
-          initialIndex: index, initialPosition: at, preload: preload);
+          initialIndex: index, initialPosition: at, preload: preload, shuffleOrder: _order);
     } on PlayerInterruptedException {
       // another queue came in meanwhile
     } on PlayerException {
@@ -357,11 +403,16 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
     await _ready;
     if (!t.playable) return;
     if (_songs.isEmpty) return playSongs([t]);
-    final at = (_player.currentIndex ?? -1) + 1;
+    final now = _player.currentIndex ?? -1;
+    final at = now + 1;
     _songs.insert(at, t);
     queue.add([for (final s in _songs) _item(s)]);
-    await _player.insertAudioSource(at, _source(t));
-    if (_player.shuffleModeEnabled) await _player.shuffle();
+    _order.after = now; // and in shuffle's order too, right after the song that plays
+    try {
+      await _player.insertAudioSource(at, _source(t));
+    } finally {
+      _order.after = null;
+    }
   }
 
   /// Puts songs at the end of the queue.
