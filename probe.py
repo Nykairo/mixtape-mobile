@@ -194,6 +194,64 @@ def home_titles():
             print("   layout?", e)
 
 
-for name, fn in [("songs", find_songs), ("video search", video_search), ("related", related), ("home", home),
-                 ("home titles", home_titles)]:
+def heat_of(vid):
+    ctx = {"client": {"clientName": "WEB", "clientVersion": "2.20251105.01.00", "hl": "en", "gl": "US"}}
+    r = requests.post("https://www.youtube.com/youtubei/v1/next?prettyPrint=false", timeout=20,
+                      json={"context": ctx, "videoId": vid}, headers={"User-Agent": UA, "Origin": "https://www.youtube.com"})
+    j = r.json()
+    for m in ((j.get("frameworkUpdates") or {}).get("entityBatchUpdate") or {}).get("mutations") or []:
+        e = (m.get("payload") or {}).get("macroMarkersListEntity")
+        if e and e["markersList"].get("markerType") == "MARKER_TYPE_HEATMAP":
+            return [(int(x["startMillis"]) / 1000, int(x["durationMillis"]) / 1000, float(x["intensityScoreNormalized"]))
+                    for x in e["markersList"]["markers"]]
+    return []
+
+
+def seconds_curve(heat, dur):
+    out = [0.0] * int(dur)
+    for a, d, v in heat:
+        for t in range(int(a), min(int(dur), int(a + d) + 1)):
+            out[t] = v
+    return out
+
+
+def align(song, video, sdur, vdur):
+    s, v = seconds_curve(song, sdur), seconds_curve(video, vdur)
+    lo, hi = -10, int(vdur - sdur) + 10
+    best = []
+    skip = max(6, int(sdur * 0.05))
+    for o in range(lo, hi + 1):
+        xs, ys = [], []
+        for t in range(skip, int(sdur) - 3):
+            if 0 <= t + o < len(v):
+                xs.append(s[t]); ys.append(v[t + o])
+        if len(xs) < sdur * 0.6:
+            continue
+        mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+        cov = sum((x - mx) * (y - my) for x, y in zip(xs, ys))
+        vx = sum((x - mx) ** 2 for x in xs) ** 0.5
+        vy = sum((y - my) ** 2 for y in ys) ** 0.5
+        if vx and vy:
+            best.append((cov / (vx * vy), o))
+    best.sort(reverse=True)
+    return best[:3]
+
+
+def heat_align():
+    vs = json.load(open(f"{OUT}/video_search.json"))
+    for q, d in vs.items():
+        song = songs[q]
+        sheat = heat_of(song["videoId"])
+        sdur = d["song"]["duration_seconds"]
+        main = d["song"]["artists"][0].lower()
+        for r in d["videos"]:
+            names = [a.get("name", "").lower() for a in r.get("artists") or []]
+            if r["videoType"] != "MUSIC_VIDEO_TYPE_OMV" or main not in names or not r["duration_seconds"]:
+                continue
+            vheat = heat_of(r["videoId"])
+            res = align(sheat, vheat, sdur, r["duration_seconds"]) if sheat and vheat else "no heat"
+            print(q, "|", r["title"][:50], r["videoId"], "diff", r["duration_seconds"] - sdur, "| best", res)
+
+
+for name, fn in [("songs", find_songs), ("heat align", heat_align)]:
     step(name, fn)
