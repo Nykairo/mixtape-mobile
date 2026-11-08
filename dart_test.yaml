@@ -1,3 +1,5 @@
 tags:
   # tests that ask the real YouTube; the build runs them on their own and only reports them
   network:
+  # pictures of the cassettes to look at (flutter test --tags gallery --update-goldens), not checks
+  gallery:
