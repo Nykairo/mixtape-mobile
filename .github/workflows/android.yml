@@ -26,9 +26,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -77,21 +77,32 @@ jobs:
             echo "No release key in the secrets: a debug-signed APK"
           fi
 
-      - name: Build the APK
-        run: flutter build apk --release --target-platform android-arm,android-arm64
+      # one APK per kind of processor: every phone from the last eight years or so takes the 64-bit one
+      - name: Build the APKs
+        run: flutter build apk --release --split-per-abi --target-platform android-arm,android-arm64
 
-      - name: Name it
+      - name: Name them
         id: name
         run: |
           version=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          cp build/app/outputs/flutter-apk/app-release.apk "Mixtape-$version.apk"
-          ls -la "Mixtape-$version.apk"
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "Mixtape-$version.apk"
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk "Mixtape-$version-older-phones.apk"
+          ls -la Mixtape-*.apk
+
+      # A song all the way: search, its audio address, and its first bytes, against the real YouTube.
+      # Only reported, never failing the build: YouTube is stricter with data centers than with phones.
+      - name: YouTube check
+        continue-on-error: true
+        run: |
+          cd android
+          ./gradlew :mixtape_native:testReleaseUnitTest --console=plain 2>&1 \
+            | grep -E "search:|resolve:|fetch:|PASSED|FAILED|Exception|BUILD" | head -40
 
       - uses: actions/upload-artifact@v4
         with:
           name: Mixtape-${{ steps.name.outputs.version }}
-          path: Mixtape-${{ steps.name.outputs.version }}.apk
+          path: Mixtape-*.apk
 
       - name: Release
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
@@ -99,10 +110,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.name.outputs.version }}
         run: |
-          notes="Mixtape $VERSION for Android. Install Mixtape-$VERSION.apk on your phone (Android 7 or newer)."
+          notes="Mixtape $VERSION for Android 7 and newer. Install Mixtape-$VERSION.apk; a phone from before 2017 or so may need Mixtape-$VERSION-older-phones.apk instead."
           if gh release view "v$VERSION" >/dev/null 2>&1; then
-            gh release upload "v$VERSION" "Mixtape-$VERSION.apk" --clobber
+            gh release upload "v$VERSION" Mixtape-*.apk --clobber
           else
-            gh release create "v$VERSION" "Mixtape-$VERSION.apk" --target "$GITHUB_SHA" \
+            gh release create "v$VERSION" Mixtape-*.apk --target "$GITHUB_SHA" \
               --title "Mixtape $VERSION for Android" --notes "$notes"
           fi

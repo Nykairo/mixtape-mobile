@@ -47,6 +47,11 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            // No shrinking for now: NewPipe's extractor and the JavaScript engine it runs YouTube's player
+            // code in find a lot of their classes by name, and a class the shrinker took out only shows as
+            // a song that won't play. The rules for when it comes back are in proguard-rules.pro.
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }

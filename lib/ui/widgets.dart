@@ -376,6 +376,7 @@ class TapeArt extends StatelessWidget {
       title: small ? '' : tape.shownName,
       slot: tape.paper ?? slotFor(tape.name),
       design: tape.design,
+      layer: App.library.layerOf(tape),
       sticky: small ? '' : tape.note,
       leftNote: small ? '' : tapeFor(tape.seconds),
       rightNote: small ? '' : _count(tape.songs.length),

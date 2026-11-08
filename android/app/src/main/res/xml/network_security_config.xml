@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Plain http is allowed for two things only Mixtape does: the player reading songs from just_audio's
+     little server on the phone itself (127.0.0.1), and podcasts whose episodes still come over plain
+     http. Everything Mixtape asks for itself (the account, YouTube) goes over https. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
