@@ -1,0 +1,64 @@
+# The quick check for work on any branch but main: the analyzer, the tests and the pictures (on a
+# "screens-<branch>" branch), without building or releasing anything. main gets all of it in android.yml.
+name: Check
+
+on:
+  push:
+    branches-ignore: [main, screens, 'screens-*', probe]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Fill in the generated files
+        run: flutter create --platforms=android --org dev.softwarevault --project-name mixtape .
+
+      - run: flutter pub get
+
+      - name: Check the code
+        id: analyze
+        continue-on-error: true
+        run: flutter analyze
+
+      - name: Tests
+        id: tests
+        continue-on-error: true
+        run: flutter test --exclude-tags "network || gallery"
+
+      - name: Pictures
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          flutter test --tags gallery --update-goldens
+          mkdir -p /tmp/screens && cd /tmp/screens
+          git init -q && git checkout -q -b "screens-$BRANCH"
+          cp "$GITHUB_WORKSPACE"/test/goldens/*.png .
+          git add .
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "Pictures at ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "screens-$BRANCH"
+
+      - name: All good?
+        if: steps.analyze.outcome == 'failure' || steps.tests.outcome == 'failure'
+        run: |
+          echo "analyze: ${{ steps.analyze.outcome }}, tests: ${{ steps.tests.outcome }}"
+          exit 1

@@ -43,6 +43,30 @@ class MixtapeNative {
     }
   }
 
+  /// A music video's picture for video mode: url (video only, at most 480 lines), height, duration
+  /// (seconds) and agent.
+  static Future<Map<String, Object?>> video(String id) async {
+    try {
+      final got = await _channel.invokeMapMethod<String, Object?>('video', {'id': id});
+      return Map<String, Object?>.of(got ?? const {});
+    } on PlatformException catch (e) {
+      throw YouTubeError(e.code, e.message ?? '');
+    }
+  }
+
+  /// Hands text (a song's link) to the phone's share sheet. False where there is none (the iPhone
+  /// copies it instead, see the app).
+  static Future<bool> share(String text) async {
+    try {
+      await _channel.invokeMethod<void>('share', {'text': text});
+      return true;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
   /// Tells the home screen widget what plays. [art] is a picture file on the phone ('' for none).
   static Future<void> widget({
     required String title,

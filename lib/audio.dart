@@ -117,7 +117,7 @@ class YouTubeSource extends StreamAudioSource {
   // ignore: experimental_member_use
   Future<StreamAudioResponse> request([int? start, int? end]) async {
     final link = await Links.get(track.ref);
-    if (_size <= 0) _size = link.length > 0 ? link.length : await _sizeOf(link);
+    if (_size <= 0) _size = await size();
     final from = start ?? 0;
     final to = min(end ?? _size, _size);
     // ignore: experimental_member_use
@@ -126,8 +126,15 @@ class YouTubeSource extends StreamAudioSource {
       contentLength: max(0, to - from),
       offset: from,
       contentType: link.mime.split(';').first.trim(),
-      stream: _bytes(from, to),
+      stream: bytes(from, to),
     );
+  }
+
+  /// How many bytes the song has.
+  Future<int> size() async {
+    if (_size > 0) return _size;
+    final link = await Links.get(track.ref);
+    return _size = link.length > 0 ? link.length : await _sizeOf(link);
   }
 
   /// The song's size, from the first byte's answer, when the lookup didn't say it.
@@ -143,7 +150,9 @@ class YouTubeSource extends StreamAudioSource {
     return total;
   }
 
-  Stream<List<int>> _bytes(int from, int to) async* {
+  /// The song's bytes from [from] up to [to]. [paced]: a few minutes ahead and then only a little faster
+  /// than the music plays (for playing); without, as fast as they come (for saving it offline).
+  Stream<List<int>> bytes(int from, int to, {bool paced = true}) async* {
     var at = from;
     var refused = 0;
     var broken = 0;
@@ -152,7 +161,7 @@ class YouTubeSource extends StreamAudioSource {
       final link = await Links.get(track.ref, fresh: refused > 0);
       // three times as fast as it plays is plenty to stay ahead, and keeps the phone's memory free
       final allowed = _ahead + clock.elapsedMilliseconds * link.bytesPerSecond * 3 ~/ 1000;
-      if (at - from > allowed) {
+      if (paced && at - from > allowed) {
         final wait = (at - from - allowed) * 1000 ~/ (link.bytesPerSecond * 3);
         await Future<void>.delayed(Duration(milliseconds: min(wait, 20000)));
       }
