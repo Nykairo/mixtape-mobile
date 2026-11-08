@@ -178,7 +178,11 @@ class TapeLook {
   /// The label's writing in the chosen pen.
   TextStyle titleStyle(double px) => switch (pen) {
         'marker' => TextStyle(fontFamily: 'Barlow Condensed', fontSize: px * 0.82, fontWeight: FontWeight.w700),
-        'type' => TextStyle(fontFamily: 'monospace', fontSize: px * 0.6, fontWeight: FontWeight.w600),
+        'type' => TextStyle(
+            fontFamily: 'monospace',
+            fontFamilyFallback: const ['Menlo', 'Courier'], // the iPhone's typewriters
+            fontSize: px * 0.6,
+            fontWeight: FontWeight.w600),
         'print' => TextStyle(
             fontFamily: 'Barlow Condensed', fontSize: px * 0.66, fontWeight: FontWeight.w600, letterSpacing: px * 0.04),
         _ => TextStyle(fontFamily: 'Covered By Your Grace', fontSize: px, height: 1.0),
@@ -544,12 +548,26 @@ class CassettePainter extends CustomPainter {
           ..shader = ui.Gradient.linear(Offset(r.right - s * 0.32, r.bottom - s * 0.32), r.bottomRight,
               [_alpha(Colors.white, 0), _alpha(Colors.white, 46), _alpha(Colors.black, 18)], const [0, 0.75, 1]));
     final box = Rect.fromLTRB(r.left + s * 0.11, r.top + s * 0.2, r.right - s * 0.09, r.bottom - s * 0.1);
+    final text = sticky.trim();
+    final words = text.split(RegExp(r'\s+'));
+    TextStyle hand(double px) => TextStyle(fontFamily: 'Covered By Your Grace', fontSize: px, height: 0.78, color: Look.ink);
+    // a word never breaks in two on a note: the writing gets smaller until the longest one fits
+    double widest(double px) {
+      var most = 0.0;
+      for (final w in words) {
+        final t = _text(w, hand(px));
+        most = max(most, t.width);
+        t.dispose();
+      }
+      return most;
+    }
+
     var px = box.height * 0.56;
     TextPainter tp;
     while (true) {
-      tp = _text(sticky.trim(), TextStyle(fontFamily: 'Covered By Your Grace', fontSize: px, height: 0.78, color: Look.ink),
-          width: box.width, lines: 3, align: TextAlign.center);
-      if ((!tp.didExceedMaxLines && tp.height <= box.height * 1.1) || px <= max(5.0, box.height * 0.2)) break;
+      tp = _text(text, hand(px), width: box.width, lines: 3, align: TextAlign.center);
+      final fits = !tp.didExceedMaxLines && tp.height <= box.height * 1.1 && widest(px) <= box.width;
+      if (fits || px <= max(5.0, box.height * 0.2)) break;
       tp.dispose();
       px -= 0.5;
     }
