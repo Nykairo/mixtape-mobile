@@ -77,6 +77,7 @@ class TapePage extends StatelessWidget {
                       title: name,
                       slot: tape == null ? 3 : (tape.paper ?? slotFor(tape.name)),
                       design: tape?.design,
+                      layer: tape == null ? null : lib.layerOf(tape),
                       sticky: tape == null ? "don't tape over!" : tape.note,
                       leftNote: tapeFor(seconds),
                       rightNote: '${songs.length} ${songs.length == 1 ? 'song' : 'songs'}',

@@ -3,6 +3,7 @@
 /// the two reels that turn while the music plays and trade tape as the song goes on.
 library;
 
+import 'dart:io';
 import 'dart:math';
 import 'dart:ui' as ui;
 
@@ -701,6 +702,7 @@ class Cassette extends StatefulWidget {
     this.progress = 0.35,
     this.playing = false,
     this.cover = '',
+    this.layer,
   });
 
   final String title;
@@ -715,6 +717,10 @@ class Cassette extends StatefulWidget {
 
   /// A cover picture's address, glued onto the label like a photo ('' for none).
   final String cover;
+
+  /// The tape studio's stickers, photos and doodles, as the computer drew them: a see-through picture
+  /// of the cassette's size laid over it (a file on the phone, or null).
+  final String? layer;
 
   @override
   State<Cassette> createState() => _CassetteState();
@@ -795,6 +801,19 @@ class _CassetteState extends State<Cassette> with SingleTickerProviderStateMixin
             ),
           ),
           Positioned.fill(child: RepaintBoundary(child: CustomPaint(painter: ReelsPainter(_reels, _look)))),
+          if (widget.layer != null)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Image.file(
+                  File(widget.layer!),
+                  fit: BoxFit.fill,
+                  filterQuality: FilterQuality.medium,
+                  cacheWidth: (size.width * MediaQuery.devicePixelRatioOf(context)).round().clamp(64, 1200),
+                  gaplessPlayback: true,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+              ),
+            ),
           if (spot != null)
             Positioned.fromRect(
               rect: spot.deflate(2.2),

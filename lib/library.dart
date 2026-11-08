@@ -3,6 +3,7 @@
 library;
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
@@ -270,6 +271,7 @@ class Library extends ChangeNotifier {
       await _pullTapes();
       await _pushTapes();
       await _syncLiked();
+      await _pullLayers();
       trouble = null;
       syncedAt = DateTime.now();
     } on AccountError catch (e) {
@@ -387,6 +389,49 @@ class Library extends ChangeNotifier {
     }
     _likedBase = mergedIds;
     _likedChanged = false;
+  }
+
+  // ------------------------------------------------------------ decorations
+
+  /// The picture of a tape's stickers, photos and doodles, as the computer drew it (the phone lays it
+  /// over its own cassette), or null when the tape has none or it isn't here yet.
+  String? layerOf(Tape tape) {
+    final name = tape.design?['layer'];
+    if (name is! String || !picturePattern.hasMatch(name)) return null;
+    final f = Store.the.file('layers/$name');
+    return f.existsSync() ? f.path : null;
+  }
+
+  /// Fetches the decoration pictures this phone doesn't have yet, and lets go of the ones no tape uses.
+  Future<void> _pullLayers() async {
+    final dir = Directory('${Store.the.dir.path}/layers');
+    final want = <String>{
+      for (final t in tapes.values)
+        if (t.design?['layer'] case final String name)
+          if (picturePattern.hasMatch(name)) name,
+    };
+    final missing = [
+      for (final n in want)
+        if (!File('${dir.path}/$n').existsSync()) n,
+    ];
+    if (missing.isNotEmpty) {
+      await dir.create(recursive: true);
+      final got = await account.pullPictures(missing);
+      for (final e in got.entries) {
+        await File('${dir.path}/${e.key}').writeAsBytes(e.value, flush: true);
+      }
+    }
+    if (dir.existsSync()) {
+      for (final f in dir.listSync().whereType<File>()) {
+        if (!want.contains(f.uri.pathSegments.last)) {
+          try {
+            f.deleteSync();
+          } on FileSystemException {
+            // in use a moment longer: next time
+          }
+        }
+      }
+    }
   }
 
   static bool _sameIds(List<String> a, List<String> b) {

@@ -184,6 +184,7 @@ class _Deck extends StatelessWidget {
             title: track.title,
             slot: tape?.paper ?? (tape != null ? slotFor(tape.name) : (liked ? 3 : 0)),
             design: tape?.design,
+            layer: tape == null ? null : App.library.layerOf(tape),
             sticky: tape?.note ?? (liked ? "don't tape over!" : ''),
             progress: (f * 200).round() / 200, // the packs move in steps too small to see
             playing: playing,
