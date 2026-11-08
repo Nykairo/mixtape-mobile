@@ -9,69 +9,36 @@ bohemian rhapsody queen -> BSTsnWoslP4 Bohemian Rhapsody 5:55 MUSIC_VIDEO_TYPE_A
 seven nation army white stripes -> D_QLxj8jCF0 Seven Nation Army 3:53 MUSIC_VIDEO_TYPE_ATV
 bad guy billie eilish -> ZD6rXLXZOEI bad guy 3:15 MUSIC_VIDEO_TYPE_ATV
 
-===== counterparts
-blinding lights the weeknd | first: J7p4bzqLvCw MUSIC_VIDEO_TYPE_ATV 3:22 | counterpart: None | lyrics: MPLYt_4U7yfKKFZLv-1 | related: MPTRt_4U7yfKKFZLv-1
-get lucky daft punk | first: 4D7u5KF7SP8 MUSIC_VIDEO_TYPE_ATV 6:10 | counterpart: None | lyrics: MPLYt_K8qWMWVqXGi-8 | related: MPTRt_K8qWMWVqXGi-8
-levitating dua lipa | first: OsfAnsMY21M MUSIC_VIDEO_TYPE_ATV 3:24 | counterpart: None | lyrics: MPLYt_iWdtzQKst5b-5 | related: MPTRt_iWdtzQKst5b-5
-as it was harry styles | first: nujn6wbr-e8 MUSIC_VIDEO_TYPE_ATV 2:48 | counterpart: None | lyrics: MPLYt_OVSyn3JG7Ru-4 | related: MPTRt_OVSyn3JG7Ru-4
-holocene bon iver | first: pvC5YD-IjL0 MUSIC_VIDEO_TYPE_ATV 5:37 | counterpart: None | lyrics: MPLYt_CV3KFsT8IdK-3 | related: MPTRt_CV3KFsT8IdK-3
-bohemian rhapsody queen | first: BSTsnWoslP4 MUSIC_VIDEO_TYPE_ATV 5:55 | counterpart: None | lyrics: MPLYt_eEpQf8QskKl-11 | related: MPTRt_eEpQf8QskKl-11
-seven nation army white stripes | first: D_QLxj8jCF0 MUSIC_VIDEO_TYPE_ATV 3:53 | counterpart: None | lyrics: MPLYt_sn5Vym75jtL-1 | related: MPTRt_sn5Vym75jtL-1
-bad guy billie eilish | first: ZD6rXLXZOEI MUSIC_VIDEO_TYPE_ATV 3:15 | counterpart: None | lyrics: MPLYt_9gAdrkio5lF-2 | related: MPTRt_9gAdrkio5lF-2
+===== video search
+blinding lights the weeknd -> [('Blinding Lights (Official Video)', '4:23'), ('Blinding Lights (Official Audio)', '3:24'), ('The Weeknd - Blinding Lights Original Extended Mix', '6:34'), ('The Weeknd - Blinding Lights (Lyrics)', '3:21')]
+get lucky daft punk -> [('Get Lucky (Live-Version)', '4:12'), ('Get Lucky (Official Audio) (feat. Pharrell Williams & Nile Rodgers)', '4:09'), ('Daft Punk vs The Doobie Brothers - Get Lucky The Long Train Running (Mash Up)', '3:54'), ('Lose Yourself to Dance (Official Version)', '4:11')]
+levitating dua lipa -> [('Levitating (feat. DaBaby)', '3:51'), ('Dua Lipa - Levitating (Lyrics)', '3:23'), ('Dua Lipa: Tiny Desk (Home) Concert', '15:58'), ('Levitating', '3:41')]
+as it was harry styles -> [('As It Was (Official Video)', '2:46'), ('As It Was', '2:45'), ('Harry Styles - As It Was // Sub Español + Lyrics // Video Oficial', '2:46'), ('❤️\u200d🔥신기록 달성중 : Harry Styles - As It Was [가사/해석/lyrics]', '2:46')]
+holocene bon iver -> [('Holocene', '5:44'), ('Bon Iver - Holocene (Lyrics)', '5:33'), ("Bon Iver - 'Holocene' Unofficial Music Video", '2:05'), ('Holocene - Bon Iver (Lyric Video)', '5:36')]
+bohemian rhapsody queen -> [('Bohemian Rhapsody', '6:00'), ('Queen - Bohemian Rhapsody (Lyrics)', '5:55'), ('Queen - Bohemian Rhapsody (Lyrics)', '6:01'), ('Bohemian Rhapsody (feat. Lauren Babic & Violet Orlandi)', '6:37')]
+seven nation army white stripes -> [('Seven Nation Army (Live)', '3:59'), ('Levi X Performed Seven Nation Army (The White Stripes) | The Voice Australia', '1:44'), ('🎧 Seven Nation Army  - The White Stripes • Sped Up 🎧', '3:35'), ('Seven Nation Army - Trinity Rock & Pop Drums Grade 1 OLD', '1:25')]
+bad guy billie eilish -> [('bad guy', '3:26'), ('Billie Eilish - bad guy (Lyrics)', '3:15'), ('"Billie Eilish - Bad Guy | Gnawa Fusion (Guembri & Qraqeb Remix)"', '3:11'), ('Billie Eilish - bad guy (Lyrics)', '3:12')]
 
-===== raw next
-audio_only wrappers: 0 counterparts: 0 size: 598013
-not_audio_only wrappers: 0 counterparts: 0 size: 597663
-plain wrappers: 0 counterparts: 0 size: 598145
-bare wrappers: 0 counterparts: 0 size: 597578
-
-===== suggestions
-['daft punk', 'daft punk harder better faster stronger', 'daft punk one more time', 'daft punk get lucky', 'daft punk around the world', 'daft punk veridis quo']
-
-===== search
-None None 252932
-songs EgWKAQIIAWoMEA4QChADEAQQCRAF 212360
-videos EgWKAQIQAWoMEA4QChADEAQQCRAF 175480
-albums EgWKAQIYAWoMEA4QChADEAQQCRAF 190964
-artists EgWKAQIgAWoMEA4QChADEAQQCRAF 22237
-playlists Eg-KAQwIABAAGAAgACgBMABqChAEEAMQCRAFEAo%3D 174670
-  all: Top result artist None
-  all: None song Around the World (Radio Edit)
-  all: None song Something About Us (Love Theme from Interstella 5555)
-  all: None song Human After All
-  all: None album Random Access Memories
-  all: None artist The Weeknd
-
-===== artist and album
-artist UCRr1xG_2WIDs18a6cIiCxeA Daft Punk
-artist keys ['description', 'descriptionRuns', 'views', 'name', 'channelId', 'shuffleId', 'radioId', 'subscribers', 'monthlyListeners', 'subscribed', 'thumbnails', 'songs', 'albums', 'singles', 'videos', 'related'] songs: 5
-album MPREb_K8qWMWVqXGi Random Access Memories
-album tracks 13 OLAK5uy_kNhM2yaBTOVwrcZJepB1C9P3-n5_Sfy5c
-
-===== lyrics
-lyrics id MPLYt_4U7yfKKFZLv-1
-timed: True {'lyrics': [LyricLine(text='♪', start_time=0, end_time=13530, id=0), LyricLine(text='Yeah', start_time=13530, end_time=16250, id=1), LyricLine(text='♪', start_time=16250, end_time=27310, id=2), LyricLine(text="I've been tryna call", start_time=27310, end_time=30130, id=3), LyricLine(text="I've been 
-lrclib 200 [00:13.13]Yeah
-[00:16.56]
-[00:27.16]I've been tryna call
-[00:29.96]I've been on my own for long enough
-[00:32.71]Maybe y
-
-===== most replayed
-J7p4bzqLvCw status 200 macroMarkersListEntity: 1 intensityScoreNormalized: 100 size 347369
+===== related
+related sections: ['You might also like', 'Recommended playlists', 'Other performances', 'Similar artists', 'Bon Iver', 'About the artist']
 
 ===== home
-FEmusic_home 418242
+FEmusic_home 200531
 FEmusic_moods_and_genres 17172
-FEmusic_charts 1134665
+FEmusic_charts 1134557
 
-===== yt-dlp
-WARNING: [youtube] No title found in player responses; falling back to title from initial data. Other metadata may also be missing
-ERROR: [youtube] J7p4bzqLvCw: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies
-WARNING: [youtube] No title found in player responses; falling back to title from initial data. Other metadata may also be missing
-ERROR: [youtube] J7p4bzqLvCw: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies
-WARNING: [youtube] No title found in player responses; falling back to title from initial data. Other metadata may also be missing
-ERROR: [youtube] J7p4bzqLvCw: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://github.com/yt-dlp/yt-dlp/wiki/Extractors#exporting-youtube-cookies  for tips on effectively exporting YouTube cookies
-None error ERROR: [youtube] J7p4bzqLvCw: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://git
-['visionos'] error ERROR: [youtube] J7p4bzqLvCw: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://git
-['tv'] error ERROR: [youtube] J7p4bzqLvCw: Sign in to confirm you’re not a bot. This helps protect our community. Use --cookies-from-browser or --cookies for the authentication. See  https://github.com/yt-dlp/yt-dlp/wiki/FAQ#how-do-i-pass-cookies-to-yt-dlp  for how to manually pass cookies. Also see  https://git
+===== home titles
+FEmusic_home carousels: 2 chips: 11
+    musicCarouselShelfRenderer Throwbacks 10
+    musicCarouselShelfRenderer Fall vibes 9
+    musicTastebuilderShelfRenderer  0
+FEmusic_charts carousels: 5 chips: 0
+    musicShelfRenderer  0
+    musicCarouselShelfRenderer Video charts 4
+    musicCarouselShelfRenderer Genres 8
+    musicCarouselShelfRenderer Top albums 50
+    musicCarouselShelfRenderer Top artists 40
+    musicCarouselShelfRenderer Weekly top podcast shows 50
+FEmusic_moods_and_genres carousels: 0 chips: 0
+    gridRenderer  13
+    gridRenderer  27
