@@ -6,6 +6,10 @@ change on the phone goes back.
 Search YouTube Music, play a song and songs like it keep coming. The music keeps going with the screen
 off, with its keys in the notification, on the lock screen, on headphones and in a home screen widget.
 
+![The tapes, as the phone draws them](https://raw.githubusercontent.com/Nykairo/mixtape-mobile/screens/cassettes.png)
+
+<sub>Drawn fresh by every build (the `screens` branch), with the app's own fonts.</sub>
+
 ## Install
 
 **Android 7 or newer:** grab `Mixtape-<version>.apk` from the [releases](../../releases), open it on the
