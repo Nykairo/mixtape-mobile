@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mixtape/account.dart';
+import 'package:mixtape/audio.dart' show QueueOrder;
 import 'package:mixtape/cassette.dart';
 import 'package:mixtape/library.dart';
 import 'package:mixtape/look.dart';
@@ -169,6 +170,27 @@ void main() {
       await lib.sync();
       expect(lib.liked.map((t) => t.ref), ['y']);
       lib.dispose();
+    });
+  });
+
+  group('shuffle order', () {
+    test('play next goes right after the song that plays, add to queue at the end', () {
+      final o = QueueOrder()..insert(0, 5);
+      o.shuffle(initialIndex: 3);
+      expect(o.indices.first, 3);
+      expect(o.indices.toSet(), {0, 1, 2, 3, 4});
+      final playing = o.indices.first;
+      o.after = playing; // "Play next" puts a song in at index 4 (right after 3 in the queue)
+      o.insert(4, 1);
+      o.after = null;
+      expect(o.indices[0], 3);
+      expect(o.indices[1], 4, reason: 'the new song is next in the shuffled order');
+      expect(o.indices.toSet(), {0, 1, 2, 3, 4, 5});
+      o.insert(6, 1); // "Add to queue"
+      expect(o.indices.last, 6);
+      o.removeRange(4, 5);
+      expect(o.indices.toSet(), {0, 1, 2, 3, 4, 5});
+      expect(o.indices.first, 3);
     });
   });
 
