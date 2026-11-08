@@ -149,7 +149,51 @@ def ytdlp():
             print(client, "error", str(e)[:300])
 
 
-for name, fn in [("songs", find_songs), ("counterparts", counterparts), ("raw next", raw_next),
-                 ("suggestions", suggestions), ("search", search), ("artist and album", artist_album),
-                 ("lyrics", lyrics), ("most replayed", heat), ("home", home), ("yt-dlp", ytdlp)]:
+def video_search():
+    out = {}
+    for q, song in songs.items():
+        artist = ", ".join(a["name"] for a in song.get("artists") or [])
+        res = yt.search(f"{song['title']} {artist}", filter="videos", limit=10)
+        out[q] = {"song": {"title": song["title"], "artists": [a["name"] for a in song.get("artists") or []],
+                           "duration_seconds": song.get("duration_seconds")},
+                  "videos": [{k: r.get(k) for k in ("title", "videoId", "artists", "duration", "duration_seconds",
+                                                     "videoType", "views", "resultType")} for r in res]}
+        print(q, "->", [(r.get("title"), r.get("duration")) for r in res[:4]])
+    save("video_search", out)
+    vid = songs["blinding lights the weeknd"]["videoId"]
+    save("search_videos_raw", yt._send_request("search", {"query": "Blinding Lights The Weeknd",
+                                                         "params": get_search_params("videos", None, False)}))
+
+
+def related():
+    wp = yt.get_watch_playlist(videoId=songs["holocene bon iver"]["videoId"], limit=1)
+    rid = wp.get("related")
+    if rid:
+        save("related_raw", yt._send_request("browse", {"browseId": rid}))
+        rel = yt.get_song_related(rid)
+        print("related sections:", [s.get("title") for s in rel])
+
+
+def home_titles():
+    for bid in ["FEmusic_home", "FEmusic_charts", "FEmusic_moods_and_genres"]:
+        j = json.load(open(f"{OUT}/browse_{bid}.json"))
+        text = json.dumps(j)
+        print(bid, "carousels:", text.count("musicCarouselShelfRenderer"), "chips:", text.count("chipCloudChipRenderer"))
+        try:
+            secs = j["contents"]["singleColumnBrowseResultsRenderer"]["tabs"][0]["tabRenderer"]["content"]["sectionListRenderer"]["contents"]
+            for sec in secs:
+                k = list(sec.keys())[0]
+                hdr = json.dumps(sec[k].get("header", {}))[:0]
+                title = ""
+                try:
+                    title = sec[k]["header"]["musicCarouselShelfBasicHeaderRenderer"]["title"]["runs"][0]["text"]
+                except Exception:
+                    pass
+                print("   ", k, title, len(sec[k].get("contents") or sec[k].get("items") or []))
+        except Exception as e:
+            print("   layout?", e)
+
+
+for name, fn in [("songs", find_songs), ("video search", video_search), ("related", related), ("home", home),
+                 ("home titles", home_titles)]:
     step(name, fn)
