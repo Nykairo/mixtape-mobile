@@ -9,36 +9,20 @@ bohemian rhapsody queen -> BSTsnWoslP4 Bohemian Rhapsody 5:55 MUSIC_VIDEO_TYPE_A
 seven nation army white stripes -> D_QLxj8jCF0 Seven Nation Army 3:53 MUSIC_VIDEO_TYPE_ATV
 bad guy billie eilish -> ZD6rXLXZOEI bad guy 3:15 MUSIC_VIDEO_TYPE_ATV
 
-===== video search
-blinding lights the weeknd -> [('Blinding Lights (Official Video)', '4:23'), ('Blinding Lights (Official Audio)', '3:24'), ('The Weeknd - Blinding Lights Original Extended Mix', '6:34'), ('The Weeknd - Blinding Lights (Lyrics)', '3:21')]
-get lucky daft punk -> [('Get Lucky (Live-Version)', '4:12'), ('Get Lucky (Official Audio) (feat. Pharrell Williams & Nile Rodgers)', '4:09'), ('Daft Punk vs The Doobie Brothers - Get Lucky The Long Train Running (Mash Up)', '3:54'), ('Lose Yourself to Dance (Official Version)', '4:11')]
-levitating dua lipa -> [('Levitating (feat. DaBaby)', '3:51'), ('Dua Lipa - Levitating (Lyrics)', '3:23'), ('Dua Lipa: Tiny Desk (Home) Concert', '15:58'), ('Levitating', '3:41')]
-as it was harry styles -> [('As It Was (Official Video)', '2:46'), ('As It Was', '2:45'), ('Harry Styles - As It Was // Sub Español + Lyrics // Video Oficial', '2:46'), ('❤️\u200d🔥신기록 달성중 : Harry Styles - As It Was [가사/해석/lyrics]', '2:46')]
-holocene bon iver -> [('Holocene', '5:44'), ('Bon Iver - Holocene (Lyrics)', '5:33'), ("Bon Iver - 'Holocene' Unofficial Music Video", '2:05'), ('Holocene - Bon Iver (Lyric Video)', '5:36')]
-bohemian rhapsody queen -> [('Bohemian Rhapsody', '6:00'), ('Queen - Bohemian Rhapsody (Lyrics)', '5:55'), ('Queen - Bohemian Rhapsody (Lyrics)', '6:01'), ('Bohemian Rhapsody (feat. Lauren Babic & Violet Orlandi)', '6:37')]
-seven nation army white stripes -> [('Seven Nation Army (Live)', '3:59'), ('Levi X Performed Seven Nation Army (The White Stripes) | The Voice Australia', '1:44'), ('🎧 Seven Nation Army  - The White Stripes • Sped Up 🎧', '3:35'), ('Seven Nation Army - Trinity Rock & Pop Drums Grade 1 OLD', '1:25')]
-bad guy billie eilish -> [('bad guy', '3:26'), ('Billie Eilish - bad guy (Lyrics)', '3:15'), ('"Billie Eilish - Bad Guy | Gnawa Fusion (Guembri & Qraqeb Remix)"', '3:11'), ('Billie Eilish - bad guy (Lyrics)', '3:12')]
-
-===== related
-related sections: ['You might also like', 'Recommended playlists', 'Other performances', 'Similar artists', 'Bon Iver', 'About the artist']
-
-===== home
-FEmusic_home 200531
-FEmusic_moods_and_genres 17172
-FEmusic_charts 1134557
-
-===== home titles
-FEmusic_home carousels: 2 chips: 11
-    musicCarouselShelfRenderer Throwbacks 10
-    musicCarouselShelfRenderer Fall vibes 9
-    musicTastebuilderShelfRenderer  0
-FEmusic_charts carousels: 5 chips: 0
-    musicShelfRenderer  0
-    musicCarouselShelfRenderer Video charts 4
-    musicCarouselShelfRenderer Genres 8
-    musicCarouselShelfRenderer Top albums 50
-    musicCarouselShelfRenderer Top artists 40
-    musicCarouselShelfRenderer Weekly top podcast shows 50
-FEmusic_moods_and_genres carousels: 0 chips: 0
-    gridRenderer  13
-    gridRenderer  27
+===== heat align
+blinding lights the weeknd | Blinding Lights (Official Video) 4NRXx6U8ABQ diff 61 | best [(0.9252579267611745, 71), (0.9246278277890558, 70), (0.9239104789399241, 69)]
+blinding lights the weeknd | Blinding Lights (Official Audio) fHI8X4OXluQ diff 2 | best [(0.9776658170239337, 2), (0.9766162414572775, 3), (0.9763571957599672, 4)]
+blinding lights the weeknd | Blinding Lights o6ytLPKscrU diff 2 | best [(0.9162780488377783, 5), (0.9158320463319467, 6), (0.9132696457345673, 4)]
+blinding lights the weeknd | Blinding Lights hNYkP0XHHYY diff 1 | best [(0.45731778263242306, 4), (0.45044520767156937, 5), (0.4432896410105152, 6)]
+blinding lights the weeknd | Blinding Lights kMQSbqZZEfA diff 10 | best [(-0.2687438482102503, 13), (-0.27261528580653693, 14), (-0.2807231131083349, 15)]
+get lucky daft punk | Get Lucky (Official Audio) (feat. Pharrell William 5NV6Rdv1a3I diff -121 | best []
+get lucky daft punk | Lose Yourself to Dance (Official Version) NF-kLy44Hls diff -119 | best []
+levitating dua lipa | Levitating (feat. DaBaby) TUVcZfQe-Kw diff 27 | best [(0.9289833150440265, 2), (0.9283592874664658, 3), (0.9276138532216628, 4)]
+levitating dua lipa | Levitating WHuBW3qKm9g diff 17 | best [(0.9892445641327801, -1), (0.9885125043674029, 0), (0.988255866798671, -2)]
+as it was harry styles | As It Was (Official Video) H5v3kku4y6Q diff -2 | best [(0.9770337404864201, 0), (0.9743095609942021, -1), (0.9714540153124505, -2)]
+as it was harry styles | As It Was BCYDWn2cPfI diff -3 | best [(0.9010172660154923, -1), (0.8979179165283325, -2), (0.8966944000871825, 0)]
+as it was harry styles | As It Was uXapuO0tgmc diff -2 | best [(0.713358419096567, 2), (0.7111897756003978, 1), (0.7087231719103251, 3)]
+holocene bon iver | Holocene TWcyIpul8OE diff 7 | best no heat
+bohemian rhapsody queen | Bohemian Rhapsody fJ9rUzIMcZQ diff 5 | best [(0.9681285668839976, 5), (0.9678376546785201, 4), (0.9677842538986298, 6)]
+seven nation army white stripes | Seven Nation Army (Live) 0J2QdDbelmY diff 6 | best [(0.990849839880834, 1), (0.9903889393522493, 0), (0.9903042944868444, 2)]
+bad guy billie eilish | bad guy DyDfgMOUjCI diff 11 | best [(0.9708509476894371, 14), (0.9692952659557285, 13), (0.9691852588725977, 15)]
