@@ -1,0 +1,19 @@
+# One-off: what YouTube Music answers right now, looked at from outside (video mode, search, lyrics,
+# most replayed). Lives on its own branch, not part of the app.
+name: probe
+on: push
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.13'
+      - run: pip install --quiet "ytmusicapi==1.12.3" "yt-dlp[default]==2026.10.21" requests
+      - run: mkdir -p probe-out && python probe.py 2>&1 | tee probe-out/log.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: probe-out
+          path: probe-out
