@@ -1,0 +1,74 @@
+# Builds Mixtape for the iPhone on every push: the app without a signature, as an .ipa in the same
+# release as the Android APKs. Sign it on the way onto the phone (AltStore, SideStore or Sideloadly
+# with your Apple ID); see README.md.
+name: iOS
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Fill in the iOS project
+        run: flutter create --platforms=ios --org dev.softwarevault --project-name mixtape .
+
+      - name: The app's own settings and icon
+        run: bash ios-extras/setup.sh
+
+      - run: flutter pub get
+
+      - name: Build (unsigned)
+        run: flutter build ios --release --no-codesign
+
+      - name: Pack the IPA
+        id: name
+        run: |
+          version=$(grep '^version:' pubspec.yaml | sed 's/version: *//; s/+.*//')
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          mkdir -p Payload
+          cp -R build/ios/iphoneos/Runner.app Payload/
+          zip -qry "Mixtape-$version.ipa" Payload
+          ls -la "Mixtape-$version.ipa"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Mixtape-${{ steps.name.outputs.version }}-iOS
+          path: Mixtape-*.ipa
+
+      - name: Release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.name.outputs.version }}
+        run: |
+          # the Android build may be making the same release right now: whoever comes second adds to it
+          for attempt in 1 2 3 4 5; do
+            if gh release view "v$VERSION" >/dev/null 2>&1; then
+              gh release upload "v$VERSION" Mixtape-*.ipa --clobber && exit 0
+            else
+              gh release create "v$VERSION" Mixtape-*.ipa --target "$GITHUB_SHA" \
+                --title "Mixtape $VERSION" --notes "Mixtape $VERSION for Android and the iPhone." && exit 0
+            fi
+            sleep 20
+          done
+          exit 1

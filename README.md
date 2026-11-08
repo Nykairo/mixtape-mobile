@@ -8,8 +8,13 @@ off, with its keys in the notification, on the lock screen, on headphones and in
 
 ## Install
 
-Grab `Mixtape-<version>.apk` from the [releases](../../releases), open it on the phone and allow the
-install. Android 7 or newer.
+**Android 7 or newer:** grab `Mixtape-<version>.apk` from the [releases](../../releases), open it on the
+phone and allow the install. (A phone from before 2017 or so may need `Mixtape-<version>-older-phones.apk`.)
+
+**iPhone:** the releases have `Mixtape-<version>.ipa`, built without a signature (there's no App Store
+version). Sign it on its way onto the phone with your own Apple ID, using
+[AltStore](https://altstore.io), [SideStore](https://sidestore.io) or [Sideloadly](https://sideloadly.io).
+With a free Apple ID the signature lasts seven days, and AltStore or SideStore renew it by themselves.
 
 ## What's in it
 
@@ -21,15 +26,18 @@ install. Android 7 or newer.
 - **Picks up where you left off**: the last song is loaded and waiting when the app opens.
 - **Home screen widget** with the song, its cover on a little cassette, and back, play and next.
 
-Not yet: the stickers, photos and doodles from the computer's tape studio (the tapes come over with
-them and keep them, the phone just doesn't draw them yet), and the iPhone version.
+The stickers, photos and doodles from the computer's tape studio come over as the computer drew them
+(Mixtape 3.8 or newer on the computer). Not yet: a home screen widget on the iPhone (the lock screen and
+Control Center show the song and its keys).
 
 ## How it's built
 
 Flutter for the screens, [just_audio](https://pub.dev/packages/just_audio) and
 [audio_service](https://pub.dev/packages/audio_service) for playing in the background, and
 [NewPipe Extractor](https://github.com/TeamNewPipe/NewPipeExtractor) on the Android side (in
-`packages/mixtape_native`) for YouTube Music. The widget is a plain Android app widget, drawn in Kotlin.
+`packages/mixtape_native`) for YouTube Music. On the iPhone, and on Android when NewPipe can't,
+`lib/innertube.dart` asks YouTube Music directly, the way its own apps do. The Android widget is a
+plain app widget, drawn in Kotlin.
 
 YouTube addresses run out after a few hours, so a song's bytes come through a small reader in
 `lib/audio.dart` that looks the address up again when YouTube stops taking it and carries on where a
