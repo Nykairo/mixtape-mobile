@@ -1,0 +1,19 @@
+name: mixtape_native
+description: The parts of Mixtape for Android that live on the Android side - YouTube through NewPipe's extractor, and the home screen widget.
+version: 0.1.0
+publish_to: none
+
+environment:
+  sdk: '>=3.6.0 <4.0.0'
+  flutter: '>=3.27.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: dev.softwarevault.mixtape_native
+        pluginClass: MixtapeNativePlugin

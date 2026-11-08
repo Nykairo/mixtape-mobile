@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="mixtape_widget_name">Mixtape</string>
+    <string name="mixtape_widget_description">The song that plays, on a little cassette, with its keys</string>
+    <string name="mixtape_widget_prev">The song before</string>
+    <string name="mixtape_widget_play">Play or pause</string>
+    <string name="mixtape_widget_next">The next song</string>
+</resources>

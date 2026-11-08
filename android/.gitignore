@@ -1,0 +1,13 @@
+gradle-wrapper.jar
+/.gradle
+/captures/
+/gradlew
+/gradlew.bat
+/local.properties
+GeneratedPluginRegistrant.java
+.cxx/
+
+# The signing key never goes into the repository (CI makes it from the repository's secrets)
+key.properties
+**/*.keystore
+**/*.jks
