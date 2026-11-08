@@ -59,7 +59,23 @@ jobs:
         run: flutter analyze
 
       - name: Tests
-        run: flutter test --exclude-tags network
+        run: flutter test --exclude-tags "network || gallery"
+
+      # pictures of the cassettes and a few page parts, drawn with the real fonts, on the "screens" branch
+      - name: Pictures
+        if: github.event_name == 'push'
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          flutter test --tags gallery --update-goldens
+          mkdir -p /tmp/screens && cd /tmp/screens
+          git init -q && git checkout -q -b screens
+          cp "$GITHUB_WORKSPACE"/test/goldens/*.png .
+          git add .
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "Pictures of the cassettes at ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" screens
 
       # the iPhone's way to YouTube (InnerTube), against the real thing: only reported
       - name: YouTube check (InnerTube)
