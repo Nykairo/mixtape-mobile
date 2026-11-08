@@ -239,6 +239,7 @@ def align(song, video, sdur, vdur):
 
 def heat_align():
     vs = json.load(open(f"{OUT}/video_search.json"))
+    pairs = []
     for q, d in vs.items():
         song = songs[q]
         sheat = heat_of(song["videoId"])
@@ -249,8 +250,10 @@ def heat_align():
             if r["videoType"] != "MUSIC_VIDEO_TYPE_OMV" or main not in names or not r["duration_seconds"]:
                 continue
             vheat = heat_of(r["videoId"])
-            res = align(sheat, vheat, sdur, r["duration_seconds"]) if sheat and vheat else "no heat"
-            print(q, "|", r["title"][:50], r["videoId"], "diff", r["duration_seconds"] - sdur, "| best", res)
+            pairs.append({"q": q, "song": song["videoId"], "song_len": sdur, "song_heat": sheat, "video": r["videoId"],
+                          "title": r["title"], "video_len": r["duration_seconds"], "video_heat": vheat})
+    save("heat_pairs", pairs)
+    print(len(pairs), "pairs")
 
 
 for name, fn in [("songs", find_songs), ("heat align", heat_align)]:
