@@ -12,7 +12,8 @@ import 'innertube.dart';
 export 'package:mixtape_native/mixtape_native.dart' show YouTubeError;
 
 class YouTube {
-  static final _inner = InnerTube(
+  /// InnerTube for everything YouTube Music shows (music.dart reads its answers).
+  static final inner = InnerTube(
     language: ui.PlatformDispatcher.instance.locale.languageCode,
     country: ui.PlatformDispatcher.instance.locale.countryCode ?? 'US',
   );
@@ -31,7 +32,7 @@ class YouTube {
       }
     }
     try {
-      return await _inner.search(query);
+      return await inner.search(query);
     } on InnerTubeError catch (e) {
       throw YouTubeError(e.why, e.detail);
     }
@@ -49,7 +50,7 @@ class YouTube {
       }
     }
     try {
-      return await _inner.resolve(id);
+      return await inner.resolve(id);
     } on InnerTubeError catch (e) {
       // when both went wrong, the more telling answer: a reason about the song itself, or else the
       // first one (from the way that usually works)

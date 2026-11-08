@@ -67,6 +67,28 @@ object YouTube {
         )
     }
 
+    /**
+     * A music video's picture for video mode: the best video-only stream up to 480 lines, H.264 in MP4
+     * where YouTube has it (the lightest for a phone to decode). The sound comes from the song itself.
+     */
+    fun video(id: String): Map<String, Any?> {
+        val info = StreamInfo.getInfo(ServiceList.YouTube, "https://www.youtube.com/watch?v=$id")
+        val plain = info.videoOnlyStreams.filter {
+            it.isUrl && it.deliveryMethod == DeliveryMethod.PROGRESSIVE_HTTP && it.height in 1..480
+        }
+        val best = plain.filter { it.format == MediaFormat.MPEG_4 && it.codec?.startsWith("avc1") == true }
+            .maxByOrNull { it.height }
+            ?: plain.filter { it.format == MediaFormat.MPEG_4 }.maxByOrNull { it.height }
+            ?: plain.maxByOrNull { it.height }
+            ?: throw IOException("no plain video stream")
+        return mapOf(
+            "url" to best.content,
+            "height" to best.height,
+            "duration" to info.duration,
+            "agent" to YoutubeParsingHelper.getVisionOsUserAgent(null),
+        )
+    }
+
     /** A short word for why a song can't be had, for the app to say it in its own words. */
     fun why(e: Throwable): String = when (e) {
         is AgeRestrictedContentException -> "age"

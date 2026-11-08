@@ -1,6 +1,7 @@
 package dev.softwarevault.mixtape_native
 
 import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -32,6 +33,16 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         when (call.method) {
             "search" -> offMain(result) { started().search(call.argument<String>("query") ?: "") }
             "resolve" -> offMain(result) { started().resolve(call.argument<String>("id") ?: "") }
+            "video" -> offMain(result) { started().video(call.argument<String>("id") ?: "") }
+            "share" -> {
+                val send = Intent(Intent.ACTION_SEND).apply {
+                    type = "text/plain"
+                    putExtra(Intent.EXTRA_TEXT, call.argument<String>("text") ?: "")
+                }
+                val chooser = Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(chooser)
+                result.success(null)
+            }
             "widget" -> {
                 NowPlayingWidget.show(
                     context,
