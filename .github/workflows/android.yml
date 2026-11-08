@@ -59,7 +59,12 @@ jobs:
         run: flutter analyze
 
       - name: Tests
-        run: flutter test
+        run: flutter test --exclude-tags network
+
+      # the iPhone's way to YouTube (InnerTube), against the real thing: only reported
+      - name: YouTube check (InnerTube)
+        continue-on-error: true
+        run: flutter test --tags network --reporter expanded 2>&1 | grep -E "search:|resolve:|fetch:|\+[0-9]+|Some tests failed|All tests passed|InnerTubeError|Expected" | head -30
 
       - name: Signing key
         env:
@@ -92,7 +97,7 @@ jobs:
 
       # A song all the way: search, its audio address, and its first bytes, against the real YouTube.
       # Only reported, never failing the build: YouTube is stricter with data centers than with phones.
-      - name: YouTube check
+      - name: YouTube check (NewPipe)
         continue-on-error: true
         run: |
           cd android
@@ -100,7 +105,8 @@ jobs:
           grep -E "Project ':" projects.log | head -20
           ./gradlew :mixtape_native:testDebugUnitTest --console=plain > youtube.log 2>&1 || true
           grep -E "search:|resolve:|fetch:|PASSED|FAILED|BUILD" youtube.log | head -40
-          grep -A 15 "What went wrong" youtube.log | head -40
+          grep -A 8 "searchResolveAndFetch FAILED" youtube.log | head -12
+          grep -E "Exception|Error:" youtube.log | grep -v "^\s*at " | head -10
 
       - uses: actions/upload-artifact@v4
         with:
