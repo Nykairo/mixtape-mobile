@@ -101,6 +101,7 @@ class Links {
 /// broke, and an address YouTube stopped taking is looked up again, so the player never notices.
 /// It reads ahead a few minutes of music and then only a little faster than the music plays, so a
 /// long song never piles up in memory.
+// ignore: experimental_member_use
 class YouTubeSource extends StreamAudioSource {
   YouTubeSource(this.track, this.client) : super(tag: track.id);
 
@@ -112,11 +113,13 @@ class YouTubeSource extends StreamAudioSource {
   static const _ahead = 3 << 20; // read right away, before the pace kicks in
 
   @override
+  // ignore: experimental_member_use
   Future<StreamAudioResponse> request([int? start, int? end]) async {
     final link = await Links.get(track.ref);
     if (_size <= 0) _size = link.length > 0 ? link.length : await _sizeOf(link);
     final from = start ?? 0;
     final to = min(end ?? _size, _size);
+    // ignore: experimental_member_use
     return StreamAudioResponse(
       sourceLength: _size,
       contentLength: max(0, to - from),

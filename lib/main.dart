@@ -40,11 +40,10 @@ Future<void> main() async {
   );
   audio.autoplay = settings.autoplay;
   audio.onPlayed = library.played;
-  App
-    ..audio = audio
-    ..library = library
-    ..account = account
-    ..settings = settings;
+  App.audio = audio;
+  App.library = library;
+  App.account = account;
+  App.settings = settings;
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     systemNavigationBarColor: Colors.transparent,

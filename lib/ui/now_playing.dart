@@ -231,7 +231,7 @@ class _Seek extends StatelessWidget {
       builder: (context, snap) {
         final total = (audio.player.duration ?? Duration(seconds: track.dur)).inMilliseconds / 1000;
         final now = (snap.data ?? Duration.zero).inMilliseconds / 1000;
-        final shown = (dragging ?? now).clamp(0.0, max(total, 0.0));
+        final double shown = min(max(dragging ?? now, 0.0), max(total, 0.0));
         final left = max(0, (total - shown).round());
         return Column(children: [
           SliderTheme(
