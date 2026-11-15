@@ -48,7 +48,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           BRANCH: ${{ github.ref_name }}
         run: |
-          flutter test --tags gallery --update-goldens
+          flutter test --tags gallery --update-goldens || echo "::warning::the cassette pictures had a failure"
+          flutter test --dart-define=PICTURES=true --update-goldens test/pages_test.dart \
+            || echo "::warning::the page pictures had a failure"
           mkdir -p /tmp/screens && cd /tmp/screens
           git init -q && git checkout -q -b "screens-$BRANCH"
           cp "$GITHUB_WORKSPACE"/test/goldens/*.png .

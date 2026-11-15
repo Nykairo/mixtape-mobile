@@ -330,6 +330,9 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
 
   AudioPlayer get player => _player;
 
+  /// Done once the player is set up and the last session is back.
+  Future<void> get ready => _ready;
+
   Stream<Duration> get position => _player.positionStream;
 
   /// The queue as it plays (shuffled when shuffle is on), and where in it the music is.

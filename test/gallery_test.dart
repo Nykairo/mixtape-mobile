@@ -4,44 +4,14 @@
 @Tags(['gallery'])
 library;
 
-import 'dart:io';
-
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mixtape/cassette.dart';
 import 'package:mixtape/look.dart';
 import 'package:mixtape/model.dart';
 import 'package:mixtape/ui/widgets.dart';
 
-Future<void> _fonts() async {
-  Future<void> family(String name, List<String> files) async {
-    final loader = FontLoader(name);
-    for (final f in files) {
-      loader.addFont(rootBundle.load(f));
-    }
-    await loader.load();
-  }
-
-  await family('Barlow', [
-    'assets/fonts/Barlow-Regular.ttf',
-    'assets/fonts/Barlow-Medium.ttf',
-    'assets/fonts/Barlow-SemiBold.ttf',
-    'assets/fonts/Barlow-Bold.ttf',
-  ]);
-  await family('Barlow Condensed', [
-    'assets/fonts/BarlowCondensed-Medium.ttf',
-    'assets/fonts/BarlowCondensed-SemiBold.ttf',
-    'assets/fonts/BarlowCondensed-Bold.ttf',
-  ]);
-  await family('Covered By Your Grace', ['assets/fonts/CoveredByYourGrace.ttf']);
-  final root = Platform.environment['FLUTTER_ROOT'];
-  final icons = File('$root/bin/cache/artifacts/material_fonts/MaterialIcons-Regular.otf');
-  if (root != null && icons.existsSync()) {
-    final loader = FontLoader('MaterialIcons')..addFont(Future.value(ByteData.sublistView(icons.readAsBytesSync())));
-    await loader.load();
-  }
-}
+import 'box.dart';
 
 Widget _frame(Widget child, {double width = 412}) => MaterialApp(
       debugShowCheckedModeBanner: false,
@@ -52,7 +22,10 @@ Widget _frame(Widget child, {double width = 412}) => MaterialApp(
     );
 
 void main() {
-  setUpAll(_fonts);
+  setUpAll(() async {
+    await loadFonts();
+    await Box.open(); // the song rows ask the library and the downloads about their songs
+  });
 
   testWidgets('cassettes', (tester) async {
     tester.view.physicalSize = const Size(1000, 1300);

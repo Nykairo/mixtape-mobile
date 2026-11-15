@@ -100,6 +100,12 @@ class _SearchPageState extends State<SearchPage> {
       body = _Recent(onPick: _submit);
     } else if (typing) {
       body = ListView(padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 16), children: [
+        if (_words.isEmpty)
+          ListTile(
+            leading: const Icon(Icons.search_rounded, color: Look.muted),
+            title: Text('Search for “$text”', style: Look.ui(15.5)),
+            onTap: () => _submit(text),
+          ),
         for (final w in _words)
           ListTile(
             leading: const Icon(Icons.search_rounded, color: Look.muted),

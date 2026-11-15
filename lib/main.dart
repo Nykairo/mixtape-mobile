@@ -113,7 +113,7 @@ class _MixtapeAppState extends State<MixtapeApp> with WidgetsBindingObserver {
         title: 'Mixtape',
         debugShowCheckedModeBanner: false,
         theme: Look.theme(),
-        home: Shell(key: Shell.key),
+        home: Shell(key: Shell.stateKey),
       ),
     );
   }

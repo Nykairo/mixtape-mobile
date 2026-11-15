@@ -102,7 +102,7 @@ class LyricsFinder {
   final _found = <String, Lyrics?>{};
   final _asking = <String, Future<Lyrics?>>{};
 
-  static final the = LyricsFinder();
+  static LyricsFinder the = LyricsFinder();
 
   /// What is known already for a song (null: none, or not asked yet; see [known]).
   Lyrics? cached(Track t) => _found[t.id];

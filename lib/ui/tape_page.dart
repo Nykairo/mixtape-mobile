@@ -317,9 +317,7 @@ class _EditOrderState extends State<EditOrder> {
       ),
       body: ReorderableListView.builder(
         itemCount: songs.length,
-        onReorder: (from, to) {
-          setState(() => App.library.move(widget.tape, from, to > from ? to - 1 : to));
-        },
+        onReorderItem: (from, to) => setState(() => App.library.move(widget.tape, from, to)),
         itemBuilder: (context, k) => ListTile(
           key: ValueKey('${songs[k].id}-$k'),
           leading: Cover(songs[k], size: 42),

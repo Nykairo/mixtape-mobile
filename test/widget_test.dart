@@ -4,7 +4,6 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mixtape/account.dart';
 import 'package:mixtape/audio.dart' show QueueOrder;
 import 'package:mixtape/cassette.dart';
 import 'package:mixtape/library.dart';
@@ -12,47 +11,7 @@ import 'package:mixtape/look.dart';
 import 'package:mixtape/model.dart';
 import 'package:mixtape/store.dart';
 
-/// An account that keeps its tapes and library in memory instead of on the server.
-class FakeAccount extends Account {
-  FakeAccount() {
-    session = Session(uid: 'u1', username: 'tester', display: 'Tester', access: 'a', refresh: 'r', expires: 9e12);
-  }
-
-  final rows = <String, Map<String, Object?>>{}; // name -> {data, deleted, updated_at}
-  Map<String, Object?> library = {};
-  int clock = 0;
-  int pushes = 0;
-
-  String _stamp() => '2026-11-08T12:00:${(clock++).toString().padLeft(2, '0')}Z';
-
-  void serverPut(String name, Map<String, Object?> data, {bool deleted = false}) =>
-      rows[name] = {'name': name, 'data': data, 'deleted': deleted, 'updated_at': _stamp()};
-
-  @override
-  Future<List<Map<String, Object?>>> pullTapes({String since = ''}) async {
-    final out = [
-      for (final r in rows.values)
-        if (since.isEmpty || '${r['updated_at']}'.compareTo(since) > 0) Map<String, Object?>.from(r),
-    ]..sort((a, b) => '${a['updated_at']}'.compareTo('${b['updated_at']}'));
-    return out;
-  }
-
-  @override
-  Future<void> pushTapes(Map<String, Map<String, Object?>> tapes) async {
-    pushes++;
-    tapes.forEach((name, data) => serverPut(name, data));
-  }
-
-  @override
-  Future<void> dropTape(String name) async => serverPut(name, const {}, deleted: true);
-
-  @override
-  Future<Map<String, Object?>> pullLibrary() async =>
-      library.isEmpty ? const {} : {'data': library, 'updated_at': _stamp()};
-
-  @override
-  Future<void> pushLibrary(Map<String, Object?> data) async => library = Map.of(data);
-}
+import 'box.dart';
 
 Map<String, Object?> song(String ref, [String title = '']) =>
     {'id': 'yt$ref', 'src': 'yt', 'ref': ref, 'title': title.isEmpty ? ref : title, 'artist': 'A', 'art': '', 'dur': 200};

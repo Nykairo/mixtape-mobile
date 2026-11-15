@@ -24,16 +24,16 @@ import 'widgets.dart';
 class Shell extends StatefulWidget {
   const Shell({super.key});
 
-  static final key = GlobalKey<ShellState>();
+  static final stateKey = GlobalKey<ShellState>();
 
   /// Which tab shows (Samples plays only while it does).
   static final tab = ValueNotifier<int>(0);
 
   /// Opens a page on the tab that shows, from anywhere (the big player closes for it).
-  static void push(Widget page) => key.currentState?._push(page);
+  static void push(Widget page) => stateKey.currentState?._push(page);
 
   /// Switches to a tab from anywhere (Home's "See all" goes to the library, say).
-  static void goTo(int tab) => key.currentState?._go(tab);
+  static void goTo(int tab) => stateKey.currentState?._go(tab);
 
   @override
   State<Shell> createState() => ShellState();

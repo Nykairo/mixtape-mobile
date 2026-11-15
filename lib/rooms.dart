@@ -33,6 +33,11 @@ double _num(Object? v, double or, double lo, double hi) {
   return min(hi, max(lo, f));
 }
 
+/// What Python calls true. The computer cleans a state by that, and both sides have to read an odd
+/// state the same way or they would play different things in the same room.
+bool _truthy(Object? v) =>
+    !(v == null || v == false || v == 0 || v == '' || (v is List && v.isEmpty) || (v is Map && v.isEmpty));
+
 /// A state as it came from the server (or anyone in the room), made safe to use.
 RoomState clean(Object? state) {
   final s = blank();
@@ -44,8 +49,8 @@ RoomState clean(Object? state) {
     for (final it in raw.take(most + played)) {
       if (it is! Map) continue;
       final t = it['t'], k = it['k'];
-      if (t is Map && t['id'] != null && t['ref'] != null && k is String && k.isNotEmpty && seen.add(k)) {
-        q.add({'k': k.length > 16 ? k.substring(0, 16) : k, 't': Map<String, Object?>.from(t), 'by': _cut('${it['by'] ?? ''}', 40)});
+      if (t is Map && _truthy(t['id']) && _truthy(t['ref']) && k is String && k.isNotEmpty && seen.add(k)) {
+        q.add({'k': _cut(k, 16), 't': Map<String, Object?>.from(t), 'by': _cut(_truthy(it['by']) ? '${it['by']}' : '', 40)});
       }
     }
   }
@@ -53,10 +58,10 @@ RoomState clean(Object? state) {
   s['k'] = q.any((it) => it['k'] == state['k']) ? state['k'] : '';
   s['pos'] = _num(state['pos'], 0, 0, 86400);
   s['at'] = _num(state['at'], 0, 0, 1e11);
-  s['paused'] = state['paused'] != false;
+  s['paused'] = !state.containsKey('paused') || _truthy(state['paused']);
   s['rate'] = _num(state['rate'], 1, 0.25, 4);
-  s['by'] = _cut('${state['by'] ?? ''}', 40);
-  s['did'] = _cut('${state['did'] ?? ''}', 20);
+  s['by'] = _cut(_truthy(state['by']) ? '${state['by']}' : '', 40);
+  s['did'] = _cut(_truthy(state['did']) ? '${state['did']}' : '', 20);
   return s;
 }
 
