@@ -1,0 +1,137 @@
+// What looks wrong on the screen right now, the way someone holding the phone would see it: words
+// lying on other words, buttons half on top of each other, words or buttons under the status bar or
+// the keys at the bottom, and words running off the side of the screen.
+//
+// Only what can be seen counts: a tap on the middle of it has to reach it. Words of a page under a
+// sheet, or scrolled out of sight, are left alone.
+
+import 'dart:math' as math;
+
+import 'package:flutter/gestures.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:flutter_test/flutter_test.dart';
+
+class _Seen {
+  _Seen(this.what, this.rect, this.box);
+
+  final String what;
+  final Rect rect;
+  final RenderBox box;
+}
+
+bool _reaches(WidgetTester tester, Offset at, RenderObject target) {
+  final result = HitTestResult();
+  tester.binding.hitTestInView(result, at, tester.view.viewId);
+  return result.path.any((h) => h.target == target);
+}
+
+Rect _global(RenderBox box, Rect local) => MatrixUtils.transformRect(box.getTransformTo(null), local);
+
+double _area(Rect r) => r.isEmpty ? 0 : r.width * r.height;
+
+/// The words on the screen that can be seen, each with the room its letters take.
+List<_Seen> _words(WidgetTester tester) {
+  final out = <_Seen>[];
+  final root = find.byType(Navigator).first;
+  for (final e in find.descendant(of: root, matching: find.byType(RichText)).evaluate()) {
+    final box = e.renderObject;
+    if (box is! RenderParagraph || !box.attached || !box.hasSize || box.size.isEmpty) continue;
+    final text = box.text.toPlainText();
+    if (text.trim().isEmpty) continue;
+    var local = Rect.zero;
+    for (final b in box.getBoxesForSelection(TextSelection(baseOffset: 0, extentOffset: text.length))) {
+      local = local.isEmpty ? b.toRect() : local.expandToInclude(b.toRect());
+    }
+    if (local.isEmpty) continue;
+    final rect = _global(box, local);
+    if (!_reaches(tester, rect.center, box)) continue;
+    out.add(_Seen(text.replaceAll('\n', ' '), rect, box));
+  }
+  return out;
+}
+
+/// The things on the screen that take a tap and can be seen.
+List<_Seen> _buttons(WidgetTester tester) {
+  final out = <_Seen>[];
+  final root = find.byType(Navigator).first;
+  final taps = find.descendant(
+    of: root,
+    matching: find.byWidgetPredicate((w) =>
+        (w is InkResponse && (w.onTap != null || w.onLongPress != null)) ||
+        (w is GestureDetector && w.onTap != null) ||
+        w is Switch ||
+        w is Slider),
+  );
+  for (final e in taps.evaluate()) {
+    final box = e.renderObject;
+    if (box is! RenderBox || !box.attached || !box.hasSize || box.size.isEmpty) continue;
+    final rect = _global(box, Offset.zero & box.size);
+    if (!_reaches(tester, rect.center, box)) continue;
+    final label = find.descendant(of: find.byElementPredicate((x) => x == e), matching: find.byType(RichText)).evaluate();
+    final words = label.isEmpty ? '' : (label.first.renderObject as RenderParagraph).text.toPlainText();
+    final tip = e.findAncestorWidgetOfExactType<Tooltip>()?.message ?? '';
+    out.add(_Seen(words.isNotEmpty ? words : (tip.isNotEmpty ? tip : e.widget.runtimeType.toString()), rect, box));
+  }
+  return out;
+}
+
+String _short(String s) => s.length > 32 ? '${s.substring(0, 30)}…' : s;
+
+/// One line for each thing that looks wrong, empty when everything sits where it should.
+List<String> layoutProblems(WidgetTester tester) {
+  final ratio = tester.view.devicePixelRatio;
+  final screen = Offset.zero & (tester.view.physicalSize / ratio);
+  final top = tester.view.padding.top / ratio;
+  final bottom = tester.view.padding.bottom / ratio;
+  final status = Rect.fromLTRB(0, 0, screen.width, top);
+  final keys = Rect.fromLTRB(0, screen.height - bottom, screen.width, screen.height);
+  final out = <String>[];
+
+  final words = _words(tester);
+  for (var i = 0; i < words.length; i++) {
+    final a = words[i];
+    if (a.rect.left < screen.left - 1 || a.rect.right > screen.right + 1) {
+      out.add('"${_short(a.what)}" runs off the side of the screen');
+    }
+    if (top > 0 && a.rect.intersect(status).height > a.rect.height * 0.3) {
+      out.add('"${_short(a.what)}" is under the status bar');
+    }
+    if (bottom > 0 && a.rect.intersect(keys).height > a.rect.height * 0.3) {
+      out.add('"${_short(a.what)}" is under the keys at the bottom');
+    }
+    for (var j = i + 1; j < words.length; j++) {
+      final b = words[j];
+      final both = a.rect.intersect(b.rect);
+      if (both.isEmpty) continue;
+      final small = math.min(_area(a.rect), _area(b.rect));
+      // the same words twice in the same place is a shadow or an outline, drawn on purpose
+      if (a.what == b.what && (a.rect.center - b.rect.center).distance < 4) continue;
+      if (_area(both) > math.max(12.0, small * 0.12)) {
+        out.add('"${_short(a.what)}" lies on "${_short(b.what)}"');
+      }
+    }
+  }
+
+  final buttons = _buttons(tester);
+  for (var i = 0; i < buttons.length; i++) {
+    final a = buttons[i];
+    final area = _area(a.rect);
+    if (top > 0 && _area(a.rect.intersect(status)) > area * 0.4) out.add('button "${_short(a.what)}" is under the status bar');
+    if (bottom > 0 && _area(a.rect.intersect(keys)) > area * 0.4) {
+      out.add('button "${_short(a.what)}" is under the keys at the bottom');
+    }
+    for (var j = i + 1; j < buttons.length; j++) {
+      final b = buttons[j];
+      final both = a.rect.intersect(b.rect);
+      if (both.isEmpty) continue;
+      // one inside the other (a key on a card) is how it's meant to be
+      if (a.rect.inflate(1).contains(b.rect.topLeft) && a.rect.inflate(1).contains(b.rect.bottomRight)) continue;
+      if (b.rect.inflate(1).contains(a.rect.topLeft) && b.rect.inflate(1).contains(a.rect.bottomRight)) continue;
+      if (_area(both) > math.min(area, _area(b.rect)) * 0.25) {
+        out.add('buttons "${_short(a.what)}" and "${_short(b.what)}" lie on each other');
+      }
+    }
+  }
+  return out;
+}

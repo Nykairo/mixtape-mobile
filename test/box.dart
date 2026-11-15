@@ -341,15 +341,22 @@ class Box {
   }
 }
 
-/// The app as it starts, on a phone-sized screen.
-Future<void> pumpApp(WidgetTester tester, {Size size = const Size(412, 892)}) async {
+/// The app as it starts, on a phone-sized screen. [bars] is the room the status bar takes at the top
+/// and the keys or the gesture bar at the bottom; [builder] goes around everything (devices_test draws
+/// those bars with it).
+Future<void> pumpApp(WidgetTester tester,
+    {Size size = const Size(412, 892), EdgeInsets bars = EdgeInsets.zero, TransitionBuilder? builder}) async {
   tester.view.devicePixelRatio = 2;
   tester.view.physicalSize = size * 2;
+  final pad = FakeViewPadding(left: bars.left * 2, top: bars.top * 2, right: bars.right * 2, bottom: bars.bottom * 2);
+  tester.view.padding = pad;
+  tester.view.viewPadding = pad;
   addTearDown(tester.view.reset);
   Shell.tab.value = 0;
   await tester.pumpWidget(MaterialApp(
     debugShowCheckedModeBanner: false,
     theme: Look.theme(),
+    builder: builder,
     home: Shell(key: Shell.stateKey),
   ));
   await wait(tester);

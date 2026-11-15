@@ -3,3 +3,5 @@ tags:
   network:
   # pictures of the cassettes to look at (flutter test --tags gallery --update-goldens), not checks
   gallery:
+  # every page on eight phones with their bars (PHONE=galaxy_s24 and so on): its own workflow, phones.yml
+  devices:

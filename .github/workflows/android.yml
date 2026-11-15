@@ -59,7 +59,7 @@ jobs:
         run: flutter analyze
 
       - name: Tests
-        run: flutter test --exclude-tags "network || gallery"
+        run: flutter test --exclude-tags "network || gallery || devices"
 
       # pictures of the cassettes and a few page parts, drawn with the real fonts, on the "screens" branch
       - name: Pictures

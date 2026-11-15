@@ -40,7 +40,7 @@ jobs:
       - name: Tests
         id: tests
         continue-on-error: true
-        run: flutter test --exclude-tags "network || gallery"
+        run: flutter test --exclude-tags "network || gallery || devices"
 
       - name: Pictures
         continue-on-error: true

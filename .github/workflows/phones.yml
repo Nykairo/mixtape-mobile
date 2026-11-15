@@ -1,0 +1,53 @@
+# Every page of the app on eight phones at once (test/devices_test.dart): Samsung's Galaxy S and A, a
+# Pixel, a small old phone, two iPhones, the Fold's outer screen and a tablet, each with its status bar
+# and its keys or gesture bar. What it finds and a picture of every page are kept with the run, one
+# download per phone ("phone-galaxy_s24" and so on).
+name: Phones
+
+on:
+  push:
+    branches: [next]
+    paths-ignore: ['**.md']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phones-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  phone:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        phone: [galaxy_s24, galaxy_a55, pixel_8, small, iphone_15, iphone_se, fold_cover, tablet]
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Fill in the generated files
+        run: flutter create --platforms=android --org dev.softwarevault --project-name mixtape .
+
+      - run: flutter pub get
+
+      - name: Every page on ${{ matrix.phone }}
+        run: |
+          flutter test --dart-define=PHONE=${{ matrix.phone }} --dart-define=PICTURES=true --update-goldens \
+            test/devices_test.dart 2>&1 | tee run.log | grep -E "problems on|^  |Some tests failed|All tests passed|EXCEPTION|══" | head -150
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: phone-${{ matrix.phone }}
+          path: |
+            test/goldens/devices/${{ matrix.phone }}
+            run.log
