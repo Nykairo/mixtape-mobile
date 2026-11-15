@@ -68,7 +68,11 @@ class _VideoViewState extends State<VideoView> with WidgetsBindingObserver {
         return;
       }
       final (url, agent) = await Videos.stream(v.id);
-      if (!mounted || ask != _asked || url.isEmpty) return;
+      if (!mounted || ask != _asked) return;
+      if (url.isEmpty) {
+        setState(() => _state = 'failed');
+        return;
+      }
       final c = VideoPlayerController.networkUrl(Uri.parse(url), httpHeaders: {if (agent.isNotEmpty) 'User-Agent': agent});
       await c.initialize();
       if (!mounted || ask != _asked) {

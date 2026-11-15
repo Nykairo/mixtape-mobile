@@ -101,7 +101,6 @@ class _NowPlayingState extends State<NowPlaying> {
     final audio = App.audio;
     final from = audio.from;
     return LayoutBuilder(builder: (context, box) {
-      final art = min(box.maxWidth - 44, box.maxHeight * 0.42);
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 22),
         child: Column(children: [
@@ -124,24 +123,35 @@ class _NowPlayingState extends State<NowPlaying> {
               child: Text('PLAYING FROM  ${from.toUpperCase()}',
                   maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.cond(11.5, spacing: 1.8, color: Look.cream.withValues(alpha: 0.7))),
             ),
-          const Spacer(),
-          SizedBox(
-            height: NowPlaying.view == 'tape' ? art / ratio : art,
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 320),
-              switchInCurve: Curves.easeOutCubic,
-              transitionBuilder: (child, a) => FadeTransition(
-                opacity: a,
-                child: ScaleTransition(scale: Tween(begin: 0.94, end: 1.0).animate(a), child: child),
-              ),
-              child: switch (NowPlaying.view) {
-                'tape' => SizedBox(key: const ValueKey('tape'), width: art, child: _Deck(track: t)),
-                'video' => VideoView(key: const ValueKey('video'), track: t, size: art),
-                _ => _BigCover(key: ValueKey('cover${t.id}'), track: t, size: art),
-              },
-            ),
+          // the cover, the cassette or the video gets the room that's left: big on a big phone, and
+          // on a small one (or with big letters) it gives way instead of pushing the keys off the screen
+          Expanded(
+            child: LayoutBuilder(builder: (context, room) {
+              final wide = box.maxWidth - 44;
+              final high = max(0.0, room.maxHeight - 24);
+              final tape = NowPlaying.view == 'tape';
+              final art = tape ? min(wide, high * ratio) : min(wide, high);
+              return Center(
+                child: SizedBox(
+                  width: art,
+                  height: tape ? art / ratio : art,
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 320),
+                    switchInCurve: Curves.easeOutCubic,
+                    transitionBuilder: (child, a) => FadeTransition(
+                      opacity: a,
+                      child: ScaleTransition(scale: Tween(begin: 0.94, end: 1.0).animate(a), child: child),
+                    ),
+                    child: switch (NowPlaying.view) {
+                      'tape' => SizedBox(key: const ValueKey('tape'), width: art, child: _Deck(track: t)),
+                      'video' => VideoView(key: const ValueKey('video'), track: t, size: art),
+                      _ => _BigCover(key: ValueKey('cover${t.id}'), track: t, size: art),
+                    },
+                  ),
+                ),
+              );
+            }),
           ),
-          const Spacer(),
           Row(children: [
             Expanded(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -694,11 +704,8 @@ class _UpNext extends StatelessWidget {
               ),
             SliverReorderableList(
               itemCount: max(0, after),
-              onReorder: (from, to) {
-                if (shuffled) return;
-                final a = view.index + 1 + from;
-                final b = view.index + 1 + (to > from ? to - 1 : to);
-                audio.moveShown(a, b);
+              onReorderItem: (from, to) {
+                if (!shuffled) audio.moveShown(view.index + 1 + from, view.index + 1 + to);
               },
               itemBuilder: (context, k) {
                 final i = view.index + 1 + k;

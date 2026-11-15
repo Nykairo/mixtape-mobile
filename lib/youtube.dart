@@ -12,8 +12,9 @@ import 'innertube.dart';
 export 'package:mixtape_native/mixtape_native.dart' show YouTubeError;
 
 class YouTube {
-  /// InnerTube for everything YouTube Music shows (music.dart reads its answers).
-  static final inner = InnerTube(
+  /// InnerTube for everything YouTube Music shows (music.dart reads its answers). The tests put one
+  /// in that answers from files.
+  static InnerTube inner = InnerTube(
     language: ui.PlatformDispatcher.instance.locale.languageCode,
     country: ui.PlatformDispatcher.instance.locale.countryCode ?? 'US',
   );
