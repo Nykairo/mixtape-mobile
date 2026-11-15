@@ -12,6 +12,7 @@ import '../app.dart';
 import '../look.dart';
 import '../model.dart';
 import '../music.dart';
+import '../phone.dart';
 import 'pages.dart';
 import 'settings_page.dart';
 import 'shell.dart';
@@ -162,6 +163,7 @@ class _HomePageState extends State<HomePage> {
               if (_chip.isNotEmpty) ..._moodShelves() else ...[
                 if (empty) const SliverToBoxAdapter(child: _Welcome()),
                 if (!empty) SliverToBoxAdapter(child: _Shortcuts(hello: _hello())),
+                if (!empty) const SliverToBoxAdapter(child: _BackgroundTip()),
                 if (_picks.isNotEmpty) ...[
                   const SliverToBoxAdapter(child: SectionTitle('Quick picks', over: 'Start a radio from a song')),
                   SliverToBoxAdapter(child: _QuickPicks(_picks)),
@@ -215,6 +217,64 @@ class _HomePageState extends State<HomePage> {
         SliverToBoxAdapter(child: CardRow(shelf.items)),
       ],
     ];
+  }
+}
+
+/// Once, on phones whose battery manager stops music in the background (Xiaomi, Huawei, Oppo, Vivo,
+/// Samsung, ...): first Android's own battery saving, then the maker's switch, in its own words.
+class _BackgroundTip extends StatelessWidget {
+  const _BackgroundTip();
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: Listenable.merge([PhoneInfo.the, App.settings]),
+      builder: (context, _) {
+        final p = PhoneInfo.the;
+        if (!p.isStrict || App.settings.backgroundTipDone) return const SizedBox.shrink();
+        final first = !p.batteryFree;
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(16, 14, 12, 8),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [Look.accent.withValues(alpha: 0.22), Look.side]),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Look.accent.withValues(alpha: 0.45)),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Icon(first ? Icons.battery_alert_rounded : Icons.tune_rounded, color: Look.accent, size: 22),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(first ? 'Keep the music going' : 'One more switch on ${p.name} phones',
+                      style: Look.ui(16, weight: FontWeight.w800)),
+                ),
+              ]),
+              const SizedBox(height: 8),
+              Text(
+                first
+                    ? 'Your ${p.name} can stop the music a while after the screen goes off. '
+                        'Let Mixtape keep playing?'
+                    : p.tip,
+                style: Look.ui(14, color: Look.cream.withValues(alpha: 0.85), height: 1.4),
+              ),
+              Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                TextButton(
+                  onPressed: App.settings.setBackgroundTipDone,
+                  child: Text(first ? 'Not now' : 'Done'),
+                ),
+                const SizedBox(width: 4),
+                FilledButton(
+                  onPressed: first ? p.askBatteryFree : p.openMakerSettings,
+                  child: Text(first ? 'Let it play' : 'Open settings'),
+                ),
+              ]),
+            ]),
+          ),
+        );
+      },
+    );
   }
 }
 

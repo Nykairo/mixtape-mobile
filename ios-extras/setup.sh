@@ -17,5 +17,7 @@ $B -c "Add :NSAppTransportSecurity dict" -c "Add :NSAppTransportSecurity:NSAllow
 $B -c "Delete :ITSAppUsesNonExemptEncryption" "$P" 2>/dev/null || true
 $B -c "Add :ITSAppUsesNonExemptEncryption bool false" "$P"
 
+# one 1024 picture each for the normal, the dark and the tinted home screen (iOS 18 and newer pick)
+rm -f ios/Runner/Assets.xcassets/AppIcon.appiconset/*
 cp ios-extras/AppIcon.appiconset/* ios/Runner/Assets.xcassets/AppIcon.appiconset/
 echo "iOS project set up: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$P"), background audio, icons"

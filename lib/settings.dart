@@ -1,6 +1,6 @@
 /// The few things to set on the phone: the tape stock (the color of what plays), whether the music goes
-/// on with songs like the last one when a list runs out, whether friends can listen along, and how the
-/// library shows.
+/// on with songs like the last one when a list runs out, whether friends can listen along, how the
+/// library shows, and whether the word about the phone's battery manager was answered.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -21,12 +21,16 @@ class Settings extends ChangeNotifier {
   bool grid = false;
   String sort = 'recent';
 
+  /// The word on Home about phones whose battery manager stops music was answered (or waved off).
+  bool backgroundTipDone = false;
+
   late final _save = LaterSave(_file, () => {
         'stock': Look.stock,
         'autoplay': autoplay,
         'share_listening': shareListening,
         'grid': grid,
         'sort': sort,
+        'background_tip_done': backgroundTipDone,
       }, delay: const Duration(milliseconds: 400));
 
   Future<void> load() async {
@@ -39,6 +43,7 @@ class Settings extends ChangeNotifier {
       grid = j['grid'] == true;
       final order = j['sort'];
       if (order is String && const {'recent', 'name', 'songs'}.contains(order)) sort = order;
+      backgroundTipDone = j['background_tip_done'] == true;
     }
   }
 
@@ -66,6 +71,13 @@ class Settings extends ChangeNotifier {
   void setLibraryView({bool? grid, String? sort}) {
     if (grid != null) this.grid = grid;
     if (sort != null) this.sort = sort;
+    _save.soon();
+    notifyListeners();
+  }
+
+  void setBackgroundTipDone() {
+    if (backgroundTipDone) return;
+    backgroundTipDone = true;
     _save.soon();
     notifyListeners();
   }

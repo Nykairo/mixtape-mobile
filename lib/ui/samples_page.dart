@@ -3,6 +3,7 @@
 /// the whole song, or say you're not interested. The music that was on waits and carries on after.
 library;
 
+import 'dart:math';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -124,7 +125,7 @@ class _SampleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = sample.track;
     final size = MediaQuery.sizeOf(context);
-    final side = size.width * 0.78;
+    final side = min(size.width * 0.78, size.height * 0.46);
     return GestureDetector(
       onTap: feed.toggle,
       onDoubleTap: () {

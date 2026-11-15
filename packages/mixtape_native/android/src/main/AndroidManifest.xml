@@ -1,5 +1,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- to ask, once and with the phone's own dialog, that battery saving leaves the music alone -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <application>
         <!-- The "Now playing" widget for the home screen (and Samsung's widget stacks) -->
         <receiver
