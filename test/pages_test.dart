@@ -24,8 +24,9 @@ import 'package:mixtape/ui/widgets.dart';
 
 import 'box.dart';
 
-/// A place in the app to open pages from, the way a tap inside it would.
-BuildContext inside(WidgetTester tester) => tester.element(find.byType(Shell));
+/// A place in the app to open pages from, the way a tap inside it would. (Also while a page covers
+/// the whole screen, which takes the Shell off the stage.)
+BuildContext inside(WidgetTester tester) => tester.element(find.byType(Shell, skipOffstage: false));
 
 void main() {
   setUpAll(() async {

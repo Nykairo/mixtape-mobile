@@ -357,9 +357,12 @@ Future<void> pumpApp(WidgetTester tester, {Size size = const Size(412, 892)}) as
 
 /// Lets a page finish what it started: its questions get their answers, its covers come in (in a run
 /// that takes pictures), its animations move on. Not pumpAndSettle: the reels never stop turning.
+///
+/// Every round lets a little real time pass too. The players were set up outside the test's clock,
+/// and whatever waits on them only moves on while the real one runs.
 Future<void> wait(WidgetTester tester, {int rounds = 4}) async {
   for (var k = 0; k < rounds; k++) {
-    if (pictures) await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 450)));
+    await tester.runAsync(() => Future<void>.delayed(Duration(milliseconds: pictures ? 450 : 40)));
     await tester.pump(const Duration(milliseconds: 250));
   }
 }
@@ -374,5 +377,7 @@ Future<void> shot(WidgetTester tester, String name) async {
 /// Takes the app off the screen again and lets its timers run out, so the next test starts clean.
 Future<void> close(WidgetTester tester) async {
   await tester.pumpWidget(const SizedBox.shrink());
-  await tester.pump(const Duration(seconds: 12));
+  // long enough for the delayed saves, and for the covers' connections to time out (15 seconds)
+  await tester.pump(const Duration(seconds: 20));
+  await tester.pump(const Duration(seconds: 20));
 }
