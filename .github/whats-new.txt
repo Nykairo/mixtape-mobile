@@ -1,0 +1,9 @@
+**New in 0.2.0**
+
+- A new look in the spirit of YouTube Music and Spotify: Home with quick picks, mixes and shelves, a search that suggests while you type (with filters and pages for artists and albums), and a library of cassettes.
+- The player switches between the song, its tape and the music video, with lyrics that follow along, a sleep timer and the speed.
+- Whole tapes, albums or single songs saved on the phone, for when there's no internet.
+- Samples: songs from their best half minute, one after the other.
+- Listening along with a friend, rooms and parties, the same ones as on the computer. Mixtape on the computer also shows the phone's song on Discord.
+- The tape studio, your listening stats and a Wrapped for the month and the year.
+- A new icon, and help for phones whose battery manager stops music in the background (Xiaomi, Samsung, Huawei, Honor, Oppo, Realme, OnePlus, Vivo, Tecno, Infinix and others).
