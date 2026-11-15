@@ -17,6 +17,7 @@ import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 import 'package:mixtape_native/mixtape_native.dart';
 
+import 'downloads.dart';
 import 'model.dart';
 import 'store.dart';
 import 'youtube.dart';
@@ -299,13 +300,26 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   /// Called with each song that starts, for the library's "played lately".
   void Function(Track)? onPlayed;
 
+  /// Called when a song stops being the one that plays, with how long it was heard, for the stats.
+  void Function(Track t, int seconds, DateTime started)? onHeard;
+
+  /// Songs the person isn't interested in: the music that keeps going leaves them out.
+  bool Function(Track)? unwanted;
+
+  /// While listening along or in a room, the keys go there instead (together.dart): true when taken.
+  bool Function(String key, [Duration? at])? steer;
+
   /// Where the music comes from, for "Playing from" ('Liked songs', a tape's name, 'Search'...), and
   /// the tape's own name when it's a tape, so the big player can show that cassette.
   String from = '';
   String fromTape = '';
 
   Timer? _keep;
+  Timer? _sleep;
   String _lastStarted = '';
+  Track? _heard;
+  DateTime _heardFrom = DateTime.now();
+  final _heardClock = Stopwatch();
   int _retries = 0;
   bool _filling = false;
 
@@ -344,15 +358,24 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
     _player.playingStream.listen((playing) {
       _keepSaving(playing);
       _widget();
-      if (!playing) _saveSession();
+      if (playing) {
+        _heardClock.start();
+      } else {
+        _heardClock.stop();
+        _saveSession();
+      }
     });
+    _player.positionStream.listen(_nearTheEnd);
     await _restore();
   }
 
   // ------------------------------------------------------------ the queue
 
-  AudioSource _source(Track t) =>
-      t.src == 'yt' ? YouTubeSource(t, _client) : AudioSource.uri(Uri.parse(t.ref), tag: t.id);
+  AudioSource _source(Track t) {
+    final saved = Downloads.the.fileOf(t);
+    if (saved != null) return AudioSource.file(saved, tag: t.id); // on the phone: no internet needed
+    return t.src == 'yt' ? YouTubeSource(t, _client) : AudioSource.uri(Uri.parse(t.ref), tag: t.id);
+  }
 
   MediaItem _item(Track t) => MediaItem(
         id: t.id,
@@ -407,6 +430,27 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   /// Starts the music. Not waited for: just_audio's play() returns only when the music pauses.
   void _go() => unawaited(_player.play().catchError((Object _) {}));
 
+  /// Listening along or in a room (together.dart): this song, from this spot, playing or not, at this
+  /// speed. The queue is the one song; a jump only when it drifted more than a moment apart.
+  Future<void> followSong(Track t, Duration at, {required bool playing, double rate = 1, String from = ''}) async {
+    await _ready;
+    this.from = from;
+    fromTape = '';
+    if (current?.id != t.id) {
+      Links.warm(t);
+      _retries = 0;
+      await _setSongs([t], 0, at, preload: true);
+    } else if ((_player.position - at).abs() > const Duration(milliseconds: 1500)) {
+      await _player.seek(at);
+    }
+    if ((_player.speed - rate).abs() > 0.01) await _player.setSpeed(rate);
+    if (playing && !_player.playing) {
+      _go();
+    } else if (!playing && _player.playing) {
+      await _player.pause();
+    }
+  }
+
   /// Puts a song right after the one playing.
   Future<void> playNext(Track t) async {
     await _ready;
@@ -448,6 +492,18 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
     await _player.removeAudioSourceAt(k);
   }
 
+  /// Moves a song in the queue, from one place in [view] to another (not while shuffle is on: the
+  /// shuffled order is its own).
+  Future<void> moveShown(int from, int to) async {
+    if (_player.shuffleModeEnabled || from == to || from < 0 || from >= _songs.length || to < 0 || to >= _songs.length) {
+      return;
+    }
+    final t = _songs.removeAt(from);
+    _songs.insert(to, t);
+    queue.add([for (final s in _songs) _item(s)]);
+    await _player.moveAudioSource(from, to);
+  }
+
   /// Plays the song at its place in [view].
   Future<void> playShown(int shown) async {
     final order = _player.shuffleModeEnabled ? _player.sequenceState.shuffleIndices : null;
@@ -463,8 +519,14 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
     if (t.id != _lastStarted) {
       _lastStarted = t.id;
       _retries = 0;
+      _countHeard(t);
       onPlayed?.call(t);
       _saveSession();
+      if (sleepAtEnd && _player.playing) {
+        // the song the sleep timer waited for ended a moment ago: this one waits at its start
+        _player.pause().then((_) => _player.seek(Duration.zero)).ignore();
+        _asleep();
+      }
     }
     final view = this.view;
     if (view.index + 1 < view.songs.length) {
@@ -476,7 +538,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
 
   /// The last song of the queue plays: songs like it go on after it (like the radio on the computer).
   Future<void> _keepGoing(Track last) async {
-    if (!autoplay || _filling || _player.loopMode != LoopMode.off || last.src != 'yt') return;
+    if (!autoplay || steer != null || _filling || _player.loopMode != LoopMode.off || last.src != 'yt') return;
     _filling = true;
     try {
       var like = Links.related(last.ref);
@@ -485,9 +547,10 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
         like = Links.related(last.ref);
       }
       final have = {for (final t in _songs) t.id};
+      final skip = unwanted;
       final fresh = [
         for (final t in like)
-          if (t.ref.isNotEmpty && have.add(t.id)) t,
+          if (t.ref.isNotEmpty && (skip == null || !skip(t)) && have.add(t.id)) t,
       ].take(10).toList();
       if (fresh.isNotEmpty && current?.id == last.id) await addSongs(fresh);
     } on Object {
@@ -577,17 +640,32 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   @override
   Future<void> play() async {
     await _ready;
+    if (steer?.call('play') ?? false) return;
     if (_songs.isNotEmpty) _go();
   }
 
   @override
-  Future<void> pause() => _player.pause();
+  Future<void> pause() async {
+    if (steer?.call('pause') ?? false) return;
+    await _player.pause();
+  }
 
   @override
-  Future<void> seek(Duration position) => _player.seek(position);
+  Future<void> seek(Duration position) async {
+    if (steer?.call('seek', position) ?? false) return;
+    await _player.seek(position);
+  }
+
+  @override
+  Future<void> setSpeed(double speed) async {
+    if (steer?.call('speed', Duration(milliseconds: (speed * 1000).round())) ?? false) return;
+    await _player.setSpeed(speed);
+    _broadcast(_player.playbackEvent);
+  }
 
   @override
   Future<void> skipToNext() async {
+    if (steer?.call('next') ?? false) return;
     if (_player.hasNext) {
       await _player.seekToNext();
     } else {
@@ -600,6 +678,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   /// Back: to the start of the song, or to the one before when it only just began.
   @override
   Future<void> skipToPrevious() async {
+    if (steer?.call('previous') ?? false) return;
     if (_player.position > const Duration(seconds: 4) || !_player.hasPrevious) {
       await _player.seek(Duration.zero);
     } else {
@@ -631,6 +710,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
 
   @override
   Future<void> stop() async {
+    _countHeard(null);
     await _saveSession();
     await _player.stop();
     await _widget();
@@ -692,6 +772,76 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   }
 
   Future<void> saveNow() => _saveSession();
+
+  // ------------------------------------------------------------ the stats
+
+  /// The song that played until now is reported with how long it was heard, and [next] starts counting.
+  void _countHeard(Track? next) {
+    final was = _heard;
+    if (was != null) {
+      final secs = (_heardClock.elapsedMilliseconds * _player.speed / 1000).round();
+      if (secs > 0) onHeard?.call(was, secs, _heardFrom);
+    }
+    _heard = next;
+    _heardFrom = DateTime.now();
+    _heardClock.reset();
+    if (_player.playing) _heardClock.start();
+  }
+
+  // ------------------------------------------------------------ the sleep timer
+
+  /// When the music stops by itself (null: no timer), or [sleepAtEnd]: at the end of the song that plays.
+  DateTime? sleepAt;
+  bool sleepAtEnd = false;
+  final sleepNews = StreamController<void>.broadcast();
+
+  void sleepIn(Duration d) {
+    _sleep?.cancel();
+    sleepAtEnd = false;
+    sleepAt = DateTime.now().add(d);
+    _sleep = Timer(d, _fallAsleep);
+    sleepNews.add(null);
+  }
+
+  void sleepAfterSong() {
+    _sleep?.cancel();
+    sleepAt = null;
+    sleepAtEnd = true;
+    sleepNews.add(null);
+  }
+
+  void sleepOff() => _asleep();
+
+  void _asleep() {
+    _sleep?.cancel();
+    sleepAt = null;
+    sleepAtEnd = false;
+    sleepNews.add(null);
+  }
+
+  /// The music fades out over a few seconds and pauses.
+  Future<void> _fallAsleep() async {
+    _asleep();
+    for (var k = 10; k >= 0 && _player.playing; k--) {
+      await _player.setVolume(k / 10);
+      await Future<void>.delayed(const Duration(milliseconds: 700));
+    }
+    await _player.pause();
+    await _player.setVolume(1);
+  }
+
+  /// The end of the song the sleep timer waits for: paused right there, the next song ready.
+  void _nearTheEnd(Duration pos) {
+    if (!sleepAtEnd || !_player.playing) return;
+    final total = _player.duration;
+    if (total == null || total.inMilliseconds < 1000) return;
+    if (pos >= total - const Duration(milliseconds: 400)) {
+      _asleep();
+      _player.pause().then((_) async {
+        if (_player.hasNext) await _player.seekToNext();
+      }).ignore();
+    }
+  }
 
   // ------------------------------------------------------------ the home screen widget
 

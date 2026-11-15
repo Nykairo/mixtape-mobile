@@ -1,31 +1,65 @@
-/// Settings: the tape stock, music that keeps going, the account, and what Mixtape is made of.
+/// Settings: the tape stock, music that keeps going, whether friends can listen along, the songs saved
+/// on the phone, the account, and what Mixtape is made of.
 library;
+
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
 import '../app.dart';
 import '../look.dart';
+import 'pages.dart';
+import 'shell.dart';
 import 'sign_in.dart';
 import 'widgets.dart';
 
-const appVersion = '0.1.0';
+const appVersion = '0.2.0';
+
+/// 3.4 MB, 1.2 GB: how much room the saved songs take.
+String sizeWords(int bytes) {
+  final mb = bytes / (1024 * 1024);
+  if (mb >= 1024) return '${(mb / 1024).toStringAsFixed(1)} GB';
+  return mb >= 10 ? '${mb.round()} MB' : '${mb.toStringAsFixed(1)} MB';
+}
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
 
+  Future<void> _clearSaved(BuildContext context) async {
+    final songs = [for (final s in App.downloads.all) s.track];
+    final sure = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (d) => AlertDialog(
+        backgroundColor: Look.side,
+        title: Text('Take all ${songs.length} songs off the phone?', style: Look.ui(19, weight: FontWeight.w700)),
+        content: Text('Your tapes stay as they are. The songs just need the internet again.',
+            style: Look.ui(15, color: Look.muted, height: 1.4)),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Keep them')),
+          FilledButton(onPressed: () => Navigator.of(d).pop(true), child: const Text('Take them off')),
+        ],
+      ),
+    );
+    if (sure != true) return;
+    await App.downloads.remove(songs);
+    if (context.mounted) say(context, 'The phone has its room back');
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
-      listenable: Listenable.merge([App.settings, App.library]),
+      listenable: Listenable.merge([App.settings, App.library, App.downloads]),
       builder: (context, _) {
         final s = App.account.session;
+        final saved = App.downloads.all.length;
         return Scaffold(
           appBar: AppBar(
             backgroundColor: Look.bg,
             surfaceTintColor: Colors.transparent,
             title: Text('Settings', style: Look.ui(19, weight: FontWeight.w700)),
           ),
-          body: ListView(padding: const EdgeInsets.only(bottom: 28), children: [
+          body: ListView(padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 28), children: [
             const SectionTitle('Tape stock'),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -55,6 +89,48 @@ class SettingsPage extends StatelessWidget {
                 App.audio.autoplay = on;
               },
             ),
+            const SectionTitle('Together'),
+            SwitchListTile(
+              value: App.settings.shareListening,
+              activeThumbColor: Look.accent,
+              title: Text('Friends can listen along', style: Look.ui(15.5)),
+              subtitle: Text(
+                s == null
+                    ? 'With a Mixtape Account, a friend who knows your user name hears what plays here.'
+                    : 'A friend who types @${s.username} hears what plays here, at the same second.',
+                style: Look.ui(13, color: Look.muted, height: 1.35),
+              ),
+              onChanged: (on) {
+                App.settings.setShareListening(on);
+                App.together.sharingChanged();
+              },
+            ),
+            const SectionTitle('Saved on this phone'),
+            ListTile(
+              leading: const Icon(Icons.download_done_rounded, color: Look.muted),
+              title: Text(saved == 0 ? 'Nothing saved yet' : '$saved ${saved == 1 ? 'song' : 'songs'}, ${sizeWords(App.downloads.bytes)}',
+                  style: Look.ui(15.5)),
+              subtitle: Text(
+                saved == 0
+                    ? 'The arrow on a tape, an album or a song saves it for when there is no internet.'
+                    : 'They play without the internet. Tap to see them.',
+                style: Look.ui(13, color: Look.muted, height: 1.35),
+              ),
+              onTap: saved == 0
+                  ? null
+                  : () => Shell.push(MixView(
+                        title: 'On this phone',
+                        blurb: 'no internet needed',
+                        songs: [for (final x in App.downloads.all) x.track],
+                        slot: 3,
+                      )),
+            ),
+            if (saved > 0)
+              ListTile(
+                leading: const Icon(Icons.delete_sweep_outlined, color: Look.muted),
+                title: Text('Take them all off the phone', style: Look.ui(15.5)),
+                onTap: () => _clearSaved(context),
+              ),
             const SectionTitle('Mixtape Account'),
             if (s == null)
               ListTile(
@@ -83,6 +159,9 @@ class SettingsPage extends StatelessWidget {
                 title: Text('Sign out', style: Look.ui(15.5)),
                 subtitle: Text('Your tapes stay on this phone', style: Look.ui(13, color: Look.muted)),
                 onTap: () async {
+                  await App.together.leaveRoom();
+                  App.together.stopAlong();
+                  await App.together.stopSharing();
                   await App.library.sync();
                   await App.account.signOut();
                   App.library.signedOut();
@@ -93,9 +172,10 @@ class SettingsPage extends StatelessWidget {
             const SectionTitle('About'),
             ListTile(
               leading: const Icon(Icons.album_rounded, color: Look.muted),
-              title: Text('Mixtape $appVersion for Android', style: Look.ui(15.5)),
+              title: Text('Mixtape $appVersion for ${Platform.isIOS ? 'iPhone' : 'Android'}', style: Look.ui(15.5)),
               subtitle: Text(
-                'Open source (GPL 3). Songs come from YouTube Music through NewPipe Extractor. Made by MinieChaos.',
+                'Open source (GPL 3). Songs come from YouTube Music, lyrics from lrclib and YouTube Music. '
+                'Made by MinieChaos.',
                 style: Look.ui(13, color: Look.muted, height: 1.35),
               ),
               onTap: () => showLicensePage(context: context, applicationName: 'Mixtape', applicationVersion: appVersion),

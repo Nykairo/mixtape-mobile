@@ -1,5 +1,6 @@
-/// Mixtape for Android: your tapes and liked songs from the Mixtape Account, YouTube Music to search
-/// and play, music that keeps going with the screen off, a notification and a home screen widget.
+/// Mixtape for phones: your tapes and liked songs from the Mixtape Account, YouTube Music to search, play
+/// and save for offline, Samples, lyrics and music videos, listening together, and music that keeps going
+/// with the screen off, with a notification and (on Android) a home screen widget.
 library;
 
 import 'package:audio_service/audio_service.dart';
@@ -9,10 +10,13 @@ import 'package:flutter/services.dart';
 import 'account.dart';
 import 'app.dart';
 import 'audio.dart';
+import 'downloads.dart';
+import 'history.dart';
 import 'library.dart';
 import 'look.dart';
 import 'settings.dart';
 import 'store.dart';
+import 'together.dart';
 import 'ui/shell.dart';
 
 Future<void> main() async {
@@ -24,6 +28,9 @@ Future<void> main() async {
   await account.load();
   final library = Library(account);
   await library.load();
+  final history = History();
+  await history.load();
+  await Downloads.the.load(); // before the music: saved songs play from their files
   final audio = await AudioService.init(
     builder: MixtapeAudio.new,
     config: AudioServiceConfig(
@@ -40,10 +47,14 @@ Future<void> main() async {
   );
   audio.autoplay = settings.autoplay;
   audio.onPlayed = library.played;
+  audio.onHeard = history.heard;
+  audio.unwanted = library.isHidden;
   App.audio = audio;
   App.library = library;
   App.account = account;
   App.settings = settings;
+  App.history = history;
+  App.together = Together(account, audio, sharing: () => settings.shareListening)..startSharing();
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     systemNavigationBarColor: Colors.transparent,
@@ -83,6 +94,8 @@ class _MixtapeAppState extends State<MixtapeApp> with WidgetsBindingObserver {
       _away = DateTime.now();
       App.library.flush();
       App.settings.flush();
+      App.history.flush();
+      App.downloads.flush();
       App.audio.saveNow();
     } else if (state == AppLifecycleState.resumed) {
       // back after a while: what changed on the computer meanwhile comes in
@@ -100,7 +113,7 @@ class _MixtapeAppState extends State<MixtapeApp> with WidgetsBindingObserver {
         title: 'Mixtape',
         debugShowCheckedModeBanner: false,
         theme: Look.theme(),
-        home: const Shell(),
+        home: Shell(key: Shell.key),
       ),
     );
   }

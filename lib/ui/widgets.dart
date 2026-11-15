@@ -1,16 +1,23 @@
-/// The small pieces the pages are built from: covers, song rows, the song menu, tape tiles, the tape
-/// counter and the bars that dance next to the song that plays.
+/// The small pieces the pages are built from: covers, song rows and the song menu, cards and rows for
+/// albums, artists and playlists, tape tiles, pills, the download button, the tape counter and the bars
+/// that dance next to the song that plays.
 library;
 
+import 'dart:io';
 import 'dart:math';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:mixtape_native/mixtape_native.dart';
 
 import '../app.dart';
 import '../cassette.dart';
 import '../look.dart';
 import '../model.dart';
+import '../music.dart';
+import 'pages.dart';
+import 'shell.dart';
 
 /// Tells the person something, at the bottom of the screen.
 void say(BuildContext context, String text) {
@@ -19,7 +26,56 @@ void say(BuildContext context, String text) {
   m?.showSnackBar(SnackBar(content: Text(text), duration: const Duration(seconds: 3)));
 }
 
-/// A song's cover, decoded at the size it shows (so a list of a hundred songs stays light).
+/// A song's link to send to someone: the phone's share sheet on Android, copied on the iPhone.
+Future<void> shareSong(BuildContext context, Track t) async {
+  final link = t.src == 'yt' ? 'https://music.youtube.com/watch?v=${t.ref}' : t.ref;
+  final text = '${t.title}${t.artist.isEmpty ? '' : ' by ${t.artist}'}\n$link';
+  if (Platform.isAndroid && await MixtapeNative.share(text)) return;
+  await Clipboard.setData(ClipboardData(text: link));
+  if (context.mounted) say(context, 'Link copied');
+}
+
+/// A picture from the internet, decoded at the size it shows (so a list of a hundred stays light).
+class Pic extends StatelessWidget {
+  const Pic(this.url, {super.key, this.size = 48, this.radius = 6, this.round = false, this.file, this.icon});
+
+  final String url;
+  final double size;
+  final double radius;
+  final bool round;
+  final File? file;
+  final IconData? icon;
+
+  @override
+  Widget build(BuildContext context) {
+    final px = (size * MediaQuery.devicePixelRatioOf(context)).round();
+    final Widget blank = ColoredBox(
+      color: Look.raised,
+      child: Center(child: Icon(icon ?? Icons.album_outlined, color: Look.faint, size: size * 0.42)),
+    );
+    final f = file;
+    final Widget image = f != null
+        ? Image.file(f, width: size, height: size, fit: BoxFit.cover, cacheWidth: px, errorBuilder: (_, __, ___) => blank)
+        : url.isEmpty
+            ? blank
+            : Image.network(
+                url,
+                width: size,
+                height: size,
+                fit: BoxFit.cover,
+                cacheWidth: px,
+                gaplessPlayback: true,
+                errorBuilder: (_, __, ___) => blank,
+                frameBuilder: (_, child, frame, sync) => frame == null && !sync ? blank : child,
+              );
+    return SizedBox.square(
+      dimension: size,
+      child: round ? ClipOval(child: image) : ClipRRect(borderRadius: BorderRadius.circular(radius), child: image),
+    );
+  }
+}
+
+/// A song's cover (the saved one when the song is on the phone).
 class Cover extends StatelessWidget {
   const Cover(this.track, {super.key, this.size = 48, this.radius = 6});
 
@@ -29,48 +85,45 @@ class Cover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final px = (size * MediaQuery.devicePixelRatioOf(context)).round();
-    final url = track.artAt(px <= 120 ? 120 : (px <= 300 ? 300 : 544));
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(radius),
-      child: SizedBox.square(
-        dimension: size,
-        child: url.isEmpty
-            ? _blank()
-            : Image.network(
-                url,
-                width: size,
-                height: size,
-                fit: BoxFit.cover,
-                cacheWidth: px,
-                gaplessPlayback: true,
-                errorBuilder: (_, __, ___) => _blank(),
-                frameBuilder: (_, child, frame, sync) => frame == null && !sync ? _blank() : child,
-              ),
-      ),
-    );
+    final px = size * MediaQuery.devicePixelRatioOf(context);
+    return Pic(track.artAt(px <= 120 ? 120 : (px <= 300 ? 300 : 544)),
+        size: size, radius: radius, file: App.downloads.coverOf(track));
   }
-
-  Widget _blank() => ColoredBox(
-        color: Look.raised,
-        child: Center(child: Icon(Icons.album_outlined, color: Look.faint, size: size * 0.45)),
-      );
 }
 
-/// A heading over a part of a page, in the deck's condensed capitals.
+/// A heading over a part of a page: a small line over a big one, the way YouTube Music does it, and
+/// maybe a "More" button.
 class SectionTitle extends StatelessWidget {
-  const SectionTitle(this.text, {super.key, this.trailing});
+  const SectionTitle(this.text, {super.key, this.over = '', this.trailing, this.onMore});
 
   final String text;
+  final String over;
   final Widget? trailing;
+  final VoidCallback? onMore;
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 22, 12, 8),
-      child: Row(children: [
-        Expanded(child: Text(text.toUpperCase(), style: Look.cond(13.5, spacing: 2.2))),
+      padding: const EdgeInsets.fromLTRB(18, 24, 12, 10),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+            if (over.isNotEmpty) Text(over.toUpperCase(), style: Look.cond(12, spacing: 2)),
+            Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(21, weight: FontWeight.w800)),
+          ]),
+        ),
         if (trailing != null) trailing!,
+        if (onMore != null)
+          OutlinedButton(
+            onPressed: onMore,
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              minimumSize: const Size(0, 32),
+              shape: const StadiumBorder(),
+              textStyle: Look.ui(13, weight: FontWeight.w700),
+            ),
+            child: const Text('More'),
+          ),
       ]),
     );
   }
@@ -96,7 +149,41 @@ class NowPlayingBuilder extends StatelessWidget {
   }
 }
 
-/// One song in a list: cover, title, artist and length, and the menu. The song that plays shows it.
+/// A rounded button with an icon and a word, the chips under YouTube Music's player.
+class Pill extends StatelessWidget {
+  const Pill(this.icon, this.text, this.onTap, {super.key, this.on = false, this.color});
+
+  final IconData icon;
+  final String text;
+  final VoidCallback? onTap;
+  final bool on;
+  final Color? color;
+
+  @override
+  Widget build(BuildContext context) {
+    final bg = on ? Look.cream : (color ?? Colors.white.withValues(alpha: 0.08));
+    final fg = on ? Look.bg : Look.cream;
+    return Material(
+      color: bg,
+      shape: const StadiumBorder(),
+      child: InkWell(
+        customBorder: const StadiumBorder(),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 14, 8),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 18, color: fg),
+            const SizedBox(width: 6),
+            Text(text, style: Look.ui(13.5, weight: FontWeight.w700, color: fg)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// One song in a list: cover (or its place on a tape), title, artist and length, whether it's on the
+/// phone, and the menu. The song that plays shows it.
 class SongRow extends StatelessWidget {
   const SongRow({
     super.key,
@@ -115,11 +202,12 @@ class SongRow extends StatelessWidget {
   final bool playing;
   final Tape? tape; // the tape the row is on, for "Take off this tape"
   final int? index;
-  final int? number; // a place number instead of the cover (on tapes, like a tracklist)
+  final int? number; // a place number instead of the cover (on tapes and albums, like a tracklist)
 
   @override
   Widget build(BuildContext context) {
     final can = track.playable;
+    final saved = App.downloads.has(track);
     final title = Text(
       track.title.isEmpty ? 'Untitled' : track.title,
       maxLines: 1,
@@ -159,10 +247,18 @@ class SongRow extends StatelessWidget {
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
               title,
-              if (sub.isNotEmpty)
+              if (sub.isNotEmpty || saved)
                 Padding(
                   padding: const EdgeInsets.only(top: 2),
-                  child: Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(13, color: Look.muted)),
+                  child: Row(children: [
+                    if (saved) ...[
+                      Icon(Icons.arrow_circle_down_rounded, size: 14, color: Look.accent),
+                      const SizedBox(width: 5),
+                    ],
+                    Expanded(
+                      child: Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(13, color: Look.muted)),
+                    ),
+                  ]),
                 ),
             ]),
           ),
@@ -177,13 +273,14 @@ class SongRow extends StatelessWidget {
   }
 }
 
-/// What can be done with a song: play it next, queue it, like it, put it on a tape, take it off this
-/// one, or play songs like it.
+/// Everything that can be done with a song: up top the four things done most, then the rest.
 Future<void> songMenu(BuildContext context, Track t, {Tape? tape, int? index}) {
   final lib = App.library;
+  final together = App.together;
   return showModalBottomSheet<void>(
     context: context,
     useRootNavigator: true,
+    isScrollControlled: true,
     builder: (sheet) {
       void done(String? word) {
         Navigator.of(sheet).pop();
@@ -191,47 +288,136 @@ Future<void> songMenu(BuildContext context, Track t, {Tape? tape, int? index}) {
       }
 
       final liked = lib.isLiked(t);
+      final saved = App.downloads.has(t);
+      final artistId = '${t.extra['artist_id'] ?? ''}';
+      final albumId = '${t.extra['album_id'] ?? ''}';
       return SafeArea(
-        child: Column(mainAxisSize: MainAxisSize.min, children: [
-          ListTile(
-            leading: Cover(t, size: 44),
-            title: Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(15.5, weight: FontWeight.w600)),
-            subtitle: Text(t.artist, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(13, color: Look.muted)),
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxHeight: MediaQuery.sizeOf(sheet).height * 0.85),
+          child: SingleChildScrollView(
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              ListTile(
+                leading: Cover(t, size: 46),
+                title: Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(15.5, weight: FontWeight.w700)),
+                subtitle: Text(t.artist, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(13, color: Look.muted)),
+                trailing: IconButton(
+                  tooltip: liked ? 'Unlike' : 'Like',
+                  onPressed: () {
+                    final now = lib.toggleLike(t);
+                    done(now ? 'In your liked songs' : 'Out of your liked songs');
+                  },
+                  icon: Icon(liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                      color: liked ? Look.accent : Look.muted),
+                ),
+              ),
+              if (t.playable)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
+                  child: Row(children: [
+                    _Big(Icons.playlist_play_rounded, 'Play next', () {
+                      App.audio.playNext(t);
+                      done('Plays after this one');
+                    }),
+                    _Big(Icons.queue_music_rounded, 'Add to queue', () {
+                      App.audio.addSongs([t]);
+                      done('Added to the queue');
+                    }),
+                    _Big(Icons.library_add_rounded, 'Put on tape', () async {
+                      Navigator.of(sheet).pop();
+                      await pickTape(context, [t]);
+                    }),
+                    _Big(Icons.ios_share_rounded, 'Share', () {
+                      Navigator.of(sheet).pop();
+                      shareSong(context, t);
+                    }),
+                  ]),
+                ),
+              const Divider(height: 1),
+              if (t.src == 'yt')
+                _MenuRow(Icons.radio_rounded, 'Start radio', () {
+                  App.audio.playSongs([t], from: '${t.title} radio');
+                  done('Playing ${t.title}, and songs like it after');
+                }),
+              if (artistId.isNotEmpty || t.artist.isNotEmpty)
+                _MenuRow(Icons.person_outline_rounded, 'Go to ${t.artist.split(',').first}', () {
+                  Navigator.of(sheet).pop();
+                  Shell.push(artistId.isNotEmpty
+                      ? ArtistView(id: artistId, name: t.artist.split(',').first)
+                      : SearchResultsView(query: t.artist.split(',').first, filter: 'artists'));
+                }),
+              if (albumId.isNotEmpty)
+                _MenuRow(Icons.album_outlined, 'Go to the album', () {
+                  Navigator.of(sheet).pop();
+                  Shell.push(AlbumView(id: albumId, title: t.album));
+                }),
+              if (t.src == 'yt')
+                _MenuRow(saved ? Icons.delete_outline_rounded : Icons.arrow_circle_down_rounded,
+                    saved ? 'Take off the phone' : 'Save on the phone', () {
+                  if (saved) {
+                    App.downloads.remove([t]);
+                    done('Taken off the phone');
+                  } else {
+                    App.downloads.save([t]);
+                    done('Saving ${t.title} on the phone');
+                  }
+                }),
+              if (together.room != null && t.playable)
+                _MenuRow(Icons.groups_rounded, together.canSteer ? 'Add to the room' : 'Ask the host for it', () {
+                  together.addSongs([t]);
+                  done(together.canSteer ? 'In the room' : null);
+                }),
+              if (t.src == 'yt')
+                _MenuRow(lib.isHidden(t) ? Icons.visibility_rounded : Icons.do_not_disturb_on_outlined,
+                    lib.isHidden(t) ? 'Interested again' : 'Not interested', () {
+                  final now = !lib.isHidden(t);
+                  lib.hide(t, now);
+                  done(now
+                      ? "Got it. It won't come up in your mixes, radios and Samples anymore."
+                      : 'It can come up in your mixes again');
+                }),
+              if (tape != null && index != null)
+                _MenuRow(Icons.remove_circle_outline_rounded, 'Take off this tape', () {
+                  lib.removeAt(tape, index);
+                  done('Off ${tape.shownName}');
+                }),
+              const SizedBox(height: 8),
+            ]),
           ),
-          const Divider(height: 1),
-          if (t.playable) ...[
-            _MenuRow(Icons.playlist_play_rounded, 'Play next', () {
-              App.audio.playNext(t);
-              done('Plays after this one');
-            }),
-            _MenuRow(Icons.queue_music_rounded, 'Add to queue', () {
-              App.audio.addSongs([t]);
-              done('Added to the queue');
-            }),
-            if (t.src == 'yt')
-              _MenuRow(Icons.radio_rounded, 'Songs like this', () {
-                App.audio.playSongs([t]);
-                done('Playing ${t.title}, and songs like it after');
-              }),
-          ],
-          _MenuRow(liked ? Icons.favorite_rounded : Icons.favorite_border_rounded, liked ? 'Unlike' : 'Like', () {
-            final now = lib.toggleLike(t);
-            done(now ? 'In your liked songs' : 'Out of your liked songs');
-          }),
-          _MenuRow(Icons.library_add_rounded, 'Put on a tape', () async {
-            Navigator.of(sheet).pop();
-            await pickTape(context, [t]);
-          }),
-          if (tape != null && index != null)
-            _MenuRow(Icons.remove_circle_outline_rounded, 'Take off this tape', () {
-              lib.removeAt(tape, index);
-              done('Off ${tape.shownName}');
-            }),
-          const SizedBox(height: 8),
-        ]),
+        ),
       );
     },
   );
+}
+
+class _Big extends StatelessWidget {
+  const _Big(this.icon, this.text, this.onTap);
+
+  final IconData icon;
+  final String text;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Expanded(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Material(
+            color: Look.raised,
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: onTap,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                child: Column(children: [
+                  Icon(icon, color: Look.cream),
+                  const SizedBox(height: 6),
+                  Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(12, weight: FontWeight.w600)),
+                ]),
+              ),
+            ),
+          ),
+        ),
+      );
 }
 
 class _MenuRow extends StatelessWidget {
@@ -244,7 +430,7 @@ class _MenuRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListTile(
         leading: Icon(icon, color: Look.muted),
-        title: Text(text, style: Look.ui(15.5)),
+        title: Text(text, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(15.5)),
         onTap: onTap,
         dense: true,
         visualDensity: const VisualDensity(vertical: 0.5),
@@ -255,7 +441,7 @@ class _MenuRow extends StatelessWidget {
 Future<void> pickTape(BuildContext context, List<Track> songs) async {
   final lib = App.library;
   final tapes = [
-    for (final t in lib.shownTapes)
+    for (final t in lib.shownTapes.reversed)
       if (t.group == null) t,
   ];
   final picked = await showModalBottomSheet<Object>(
@@ -284,7 +470,7 @@ Future<void> pickTape(BuildContext context, List<Track> songs) async {
                 return ListTile(
                   leading: SizedBox(width: 56, child: TapeArt(tape: tape, small: true)),
                   title: Text(tape.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(15.5)),
-                  subtitle: Text(_count(tape.songs.length), style: Look.ui(13, color: Look.muted)),
+                  subtitle: Text(count(tape.songs.length), style: Look.ui(13, color: Look.muted)),
                   onTap: () => Navigator.of(sheet).pop(tape),
                 );
               },
@@ -306,7 +492,7 @@ Future<void> pickTape(BuildContext context, List<Track> songs) async {
   say(context, n == 0 ? 'Already on ${tape.shownName}' : 'On ${tape.shownName}');
 }
 
-String _count(int n) => n == 1 ? '1 song' : '$n songs';
+String count(int n, [String what = 'song']) => n == 1 ? '1 $what' : '$n ${what}s';
 
 /// Asks for a line of text (a tape's name, say). Null when the person changed their mind.
 Future<String?> askText(BuildContext context,
@@ -365,10 +551,11 @@ class _AskState extends State<_Ask> {
 
 /// A tape as a little cassette with its own label, paper and decorations.
 class TapeArt extends StatelessWidget {
-  const TapeArt({super.key, required this.tape, this.small = false});
+  const TapeArt({super.key, required this.tape, this.small = false, this.playing = false});
 
   final Tape tape;
   final bool small;
+  final bool playing;
 
   @override
   Widget build(BuildContext context) {
@@ -379,22 +566,46 @@ class TapeArt extends StatelessWidget {
       layer: App.library.layerOf(tape),
       sticky: small ? '' : tape.note,
       leftNote: small ? '' : tapeFor(tape.seconds),
-      rightNote: small ? '' : _count(tape.songs.length),
+      rightNote: small ? '' : count(tape.songs.length),
+      playing: playing,
+    );
+  }
+}
+
+/// The liked songs as a tape of their own (the computer writes "don't tape over!" on its note).
+class LikedArt extends StatelessWidget {
+  const LikedArt({super.key, this.small = false, this.playing = false});
+
+  final bool small;
+  final bool playing;
+
+  @override
+  Widget build(BuildContext context) {
+    final liked = App.library.liked;
+    return Cassette(
+      title: small ? '' : 'Liked songs',
+      slot: 3,
+      sticky: small ? '' : "don't tape over!",
+      leftNote: small ? '' : tapeFor(liked.fold(0, (s, t) => s + t.dur)),
+      rightNote: small ? '' : count(liked.length),
+      playing: playing,
     );
   }
 }
 
 /// A cassette with nothing but a title on its label (the cream paper of the tape stock).
 class TapeArtPlain extends StatelessWidget {
-  const TapeArtPlain({super.key, required this.title, this.playing = false, this.sticky = '', this.slot = 0});
+  const TapeArtPlain({super.key, required this.title, this.playing = false, this.sticky = '', this.slot = 0, this.design});
 
   final String title;
   final bool playing;
   final String sticky;
   final int slot;
+  final Map<String, Object?>? design;
 
   @override
-  Widget build(BuildContext context) => Cassette(title: title, slot: slot, sticky: sticky, playing: playing);
+  Widget build(BuildContext context) =>
+      Cassette(title: title, slot: slot, sticky: sticky, playing: playing, design: design);
 }
 
 /// A tape in a grid or a row: the cassette and its name under it.
@@ -418,7 +629,7 @@ class TapeTile extends StatelessWidget {
             TapeArt(tape: tape),
             const SizedBox(height: 8),
             Text(tape.shownName, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(14.5, weight: FontWeight.w600)),
-            Text('${_count(tape.songs.length)}  ·  ${tapeFor(tape.seconds)}',
+            Text('${count(tape.songs.length)}  ·  ${tapeFor(tape.seconds)}',
                 maxLines: 1, style: Look.ui(12.5, color: Look.muted)),
           ]),
         ),
@@ -427,20 +638,256 @@ class TapeTile extends StatelessWidget {
   }
 }
 
+/// An album, a playlist, an artist or a video as a card in a row: the picture (round for an artist),
+/// its name and the line under it.
+class ItemCard extends StatelessWidget {
+  const ItemCard(this.item, {super.key, this.width = 150, this.list});
+
+  final Item item;
+  final double width;
+
+  /// For a song or video: the list it plays in.
+  final List<Item>? list;
+
+  @override
+  Widget build(BuildContext context) {
+    final round = item.kind == Kind.artist;
+    final wide = item.kind == Kind.video;
+    final h = wide ? width * 9 / 16 : width;
+    return SizedBox(
+      width: width,
+      child: InkWell(
+        onTap: () => openItem(context, item, list: list),
+        onLongPress: item.playable ? () => songMenu(context, item.track) : null,
+        borderRadius: BorderRadius.circular(10),
+        child: Padding(
+          padding: const EdgeInsets.all(5),
+          child: Column(crossAxisAlignment: round ? CrossAxisAlignment.center : CrossAxisAlignment.start, children: [
+            if (wide)
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(width: width, height: h, child: _WidePic(item.art)),
+              )
+            else
+              Pic(item.art, size: width - 10, radius: 8, round: round, icon: round ? Icons.person_rounded : null),
+            const SizedBox(height: 8),
+            Text(item.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                textAlign: round ? TextAlign.center : TextAlign.start,
+                style: Look.ui(14, weight: FontWeight.w600, height: 1.2)),
+            if (item.subtitle.isNotEmpty)
+              Text(item.subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: round ? TextAlign.center : TextAlign.start,
+                  style: Look.ui(12.5, color: Look.muted)),
+          ]),
+        ),
+      ),
+    );
+  }
+}
+
+class _WidePic extends StatelessWidget {
+  const _WidePic(this.url);
+
+  final String url;
+
+  @override
+  Widget build(BuildContext context) => url.isEmpty
+      ? const ColoredBox(color: Look.raised)
+      : Image.network(url, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const ColoredBox(color: Look.raised));
+}
+
+/// A row of cards that scrolls sideways.
+class CardRow extends StatelessWidget {
+  const CardRow(this.items, {super.key, this.width = 150});
+
+  final List<Item> items;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    final video = items.isNotEmpty && items.every((i) => i.kind == Kind.video);
+    final scale = MediaQuery.textScalerOf(context).scale(1);
+    final height = (video ? width * 9 / 16 : width) + 66 * scale;
+    return SizedBox(
+      height: height,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 12),
+        itemCount: items.length,
+        itemBuilder: (_, k) => ItemCard(items[k], width: video ? width * 1.35 : width, list: items),
+      ),
+    );
+  }
+}
+
+/// A search result of any kind, as a row.
+class ItemRow extends StatelessWidget {
+  const ItemRow(this.item, {super.key, this.list});
+
+  final Item item;
+  final List<Item>? list;
+
+  @override
+  Widget build(BuildContext context) {
+    if (item.playable) {
+      final songs = [
+        for (final i in list ?? [item])
+          if (i.playable) i.track,
+      ];
+      final t = item.track;
+      return NowPlayingBuilder(
+        builder: (context, now, playing) => SongRow(
+          track: t,
+          current: now?.id == t.id,
+          playing: playing,
+          onTap: () => App.audio.playSongs(songs, start: max(0, songs.indexWhere((x) => x.id == t.id)), from: 'Search'),
+        ),
+      );
+    }
+    final kind = switch (item.kind) {
+      Kind.album => 'Album',
+      Kind.artist => 'Artist',
+      Kind.playlist => 'Playlist',
+      _ => '',
+    };
+    final sub = [kind, if (item.subtitle.isNotEmpty) item.subtitle].join('  ·  ');
+    return InkWell(
+      onTap: () => openItem(context, item),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 7, 12, 7),
+        child: Row(children: [
+          Pic(item.art, size: 48, radius: 6, round: item.kind == Kind.artist, icon: item.kind == Kind.artist ? Icons.person_rounded : null),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(15.5, weight: FontWeight.w600)),
+              Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(13, color: Look.muted)),
+            ]),
+          ),
+          const Icon(Icons.chevron_right_rounded, color: Look.faint),
+        ]),
+      ),
+    );
+  }
+}
+
+/// Opens what was tapped: a song or a video plays (in its list), the rest opens its page.
+void openItem(BuildContext context, Item item, {List<Item>? list}) {
+  switch (item.kind) {
+    case Kind.song || Kind.video:
+      final songs = [
+        for (final i in list ?? [item])
+          if (i.playable) i.track,
+      ];
+      final start = max(0, songs.indexWhere((t) => t.ref == item.id));
+      App.audio.playSongs(songs, start: start, from: item.kind == Kind.video ? 'Videos' : 'Songs');
+    case Kind.artist:
+      App.library.openedItem({'kind': 'artist', 'id': item.id, 'title': item.title, 'art': item.art});
+      Shell.push(ArtistView(id: item.id, name: item.title));
+    case Kind.album || Kind.playlist:
+      App.library.openedItem({
+        'kind': item.kind == Kind.album ? 'album' : 'playlist',
+        'id': item.id,
+        'title': item.title,
+        'art': item.art,
+        'subtitle': item.subtitle,
+      });
+      Shell.push(AlbumView(id: item.id, title: item.title));
+    case Kind.other:
+      say(context, "That doesn't open here");
+  }
+}
+
+/// Saves a list of songs on the phone, shows how far it is, or takes them off again.
+class DownloadButton extends StatelessWidget {
+  const DownloadButton({super.key, required this.songs, this.name = '', this.size = 40});
+
+  final List<Track> songs;
+  final String name;
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: App.downloads,
+      builder: (context, _) {
+        final d = App.downloads;
+        final (have, total) = d.count(songs);
+        final busy = d.busyWith(songs);
+        final all = total > 0 && have == total;
+        return IconButton(
+          tooltip: busy ? 'Saving on the phone. Tap to stop' : (all ? 'On the phone' : 'Save on the phone'),
+          iconSize: size * 0.62,
+          onPressed: total == 0
+              ? null
+              : () async {
+                  if (busy) {
+                    d.cancel(songs);
+                    say(context, 'Stopped. What came down stays on the phone.');
+                  } else if (all) {
+                    final sure = await _askRemove(context, name);
+                    if (sure == true) await d.remove(songs);
+                  } else {
+                    final n = d.save(songs, name: name.isEmpty ? 'Your songs' : name);
+                    if (context.mounted && n > 0) say(context, 'Saving ${count(n)} on the phone');
+                  }
+                },
+          icon: SizedBox.square(
+            dimension: size * 0.7,
+            child: Stack(alignment: Alignment.center, children: [
+              if (busy)
+                CircularProgressIndicator(
+                  strokeWidth: 2.4,
+                  value: total == 0 ? null : (have + d.progress) / total,
+                  color: Look.accent,
+                  backgroundColor: Look.edge,
+                ),
+              Icon(
+                all ? Icons.arrow_circle_down_rounded : (busy ? Icons.stop_rounded : Icons.arrow_circle_down_outlined),
+                size: busy ? size * 0.38 : size * 0.62,
+                color: all ? Look.accent : Look.cream,
+              ),
+            ]),
+          ),
+        );
+      },
+    );
+  }
+
+  static Future<bool?> _askRemove(BuildContext context, String name) => showDialog<bool>(
+        context: context,
+        useRootNavigator: true,
+        builder: (d) => AlertDialog(
+          backgroundColor: Look.side,
+          title: Text('Take ${name.isEmpty ? 'these songs' : name} off the phone?', style: Look.ui(19, weight: FontWeight.w700)),
+          content: Text('They stay where they are, they just need the internet again.',
+              style: Look.ui(15, color: Look.muted, height: 1.4)),
+          actions: [
+            TextButton(onPressed: () => Navigator.of(d).pop(false), child: const Text('Keep them')),
+            FilledButton(onPressed: () => Navigator.of(d).pop(true), child: const Text('Take them off')),
+          ],
+        ),
+      );
+}
+
 /// Little bars that dance next to the song that plays (and stand still while it's paused).
 class PlayingBars extends StatefulWidget {
-  const PlayingBars({super.key, required this.playing, this.size = 18});
+  const PlayingBars({super.key, required this.playing, this.size = 18, this.color});
 
   final bool playing;
   final double size;
+  final Color? color;
 
   @override
   State<PlayingBars> createState() => _PlayingBarsState();
 }
 
 class _PlayingBarsState extends State<PlayingBars> with SingleTickerProviderStateMixin {
-  late final AnimationController _a =
-      AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
+  late final AnimationController _a = AnimationController(vsync: this, duration: const Duration(milliseconds: 1400));
 
   @override
   void initState() {
@@ -468,7 +915,7 @@ class _PlayingBarsState extends State<PlayingBars> with SingleTickerProviderStat
   Widget build(BuildContext context) {
     return SizedBox.square(
       dimension: widget.size,
-      child: CustomPaint(painter: _BarsPainter(_a, Look.accent)),
+      child: CustomPaint(painter: _BarsPainter(_a, widget.color ?? Look.accent)),
     );
   }
 }
@@ -497,16 +944,17 @@ class _BarsPainter extends CustomPainter {
 
 /// The tape counter: digits in lit segments, the way the deck on the computer shows the time.
 class Counter extends StatelessWidget {
-  const Counter(this.text, {super.key, this.height = 22});
+  const Counter(this.text, {super.key, this.height = 22, this.color});
 
   final String text;
   final double height;
+  final Color? color;
 
   @override
   Widget build(BuildContext context) {
     return CustomPaint(
       size: Size(_Segments.widthOf(text, height), height),
-      painter: _Segments(text, Look.accent),
+      painter: _Segments(text, color ?? Look.accent),
     );
   }
 }
