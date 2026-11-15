@@ -1,7 +1,7 @@
 # Every page of the app on eight phones at once (test/devices_test.dart): Samsung's Galaxy S and A, a
 # Pixel, a small old phone, two iPhones, the Fold's outer screen and a tablet, each with its status bar
-# and its keys or gesture bar. What it finds and a picture of every page are kept with the run, one
-# download per phone ("phone-galaxy_s24" and so on).
+# and its keys or gesture bar. What it finds and a picture of every page end up on the "phones" branch,
+# a folder per phone.
 name: Phones
 
 on:
@@ -11,7 +11,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: phones-${{ github.ref }}
@@ -51,3 +51,25 @@ jobs:
           path: |
             test/goldens/devices/${{ matrix.phone }}
             run.log
+
+  # all eight on one branch, a folder each (problems.txt says what turned up)
+  gather:
+    needs: phone
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: phone-*
+          path: phones
+      - name: Onto the phones branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cd phones
+          for d in phone-*; do mv "$d" "${d#phone-}"; done
+          git init -q && git checkout -q -b phones
+          git add .
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "Every page on eight phones at ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" phones
