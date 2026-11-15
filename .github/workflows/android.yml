@@ -143,6 +143,8 @@ jobs:
 
           **iPhone:** Mixtape-$VERSION.ipa is unsigned. Put it on the phone with AltStore, SideStore or Sideloadly and your Apple ID (see the README)."
           notes=$(printf '%s\n' "$notes" | sed 's/^          //')
+          # what's new in this version goes on top (.github/whats-new.txt, written for each release)
+          if [ -f .github/whats-new.txt ]; then notes="$(cat .github/whats-new.txt)"$'\n\n'"$notes"; fi
           # the iPhone build may be making the same release right now: whoever comes second adds to it
           for attempt in 1 2 3 4 5; do
             if gh release view "v$VERSION" >/dev/null 2>&1; then
