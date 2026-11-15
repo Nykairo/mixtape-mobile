@@ -496,19 +496,29 @@ String count(int n, [String what = 'song']) => n == 1 ? '1 $what' : '$n ${what}s
 
 /// Asks for a line of text (a tape's name, say). Null when the person changed their mind.
 Future<String?> askText(BuildContext context,
-    {required String title, String hint = '', String start = '', String action = 'OK', int max = 80}) {
+    {required String title, String hint = '', String start = '', String action = 'OK', int max = 80, bool blank = false}) {
   return showDialog<String>(
     context: context,
     useRootNavigator: true,
-    builder: (_) => _Ask(title: title, hint: hint, start: start, action: action, max: max),
+    builder: (_) => _Ask(title: title, hint: hint, start: start, action: action, max: max, blank: blank),
   );
 }
 
 class _Ask extends StatefulWidget {
-  const _Ask({required this.title, required this.hint, required this.start, required this.action, required this.max});
+  const _Ask({
+    required this.title,
+    required this.hint,
+    required this.start,
+    required this.action,
+    required this.max,
+    required this.blank,
+  });
 
   final String title, hint, start, action;
   final int max;
+
+  /// Whether nothing is an answer too (a sticky note can be taken off by leaving it empty).
+  final bool blank;
 
   @override
   State<_Ask> createState() => _AskState();
@@ -525,7 +535,7 @@ class _AskState extends State<_Ask> {
 
   void _done() {
     final v = _field.text.trim();
-    Navigator.of(context).pop(v.isEmpty ? null : v);
+    Navigator.of(context).pop(v.isEmpty && !widget.blank ? null : v);
   }
 
   @override
@@ -653,7 +663,7 @@ class ItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final round = item.kind == Kind.artist;
     final wide = item.kind == Kind.video;
-    final h = wide ? width * 9 / 16 : width;
+    final h = (width - 10) * 9 / 16;
     return SizedBox(
       width: width,
       child: InkWell(
@@ -666,7 +676,7 @@ class ItemCard extends StatelessWidget {
             if (wide)
               ClipRRect(
                 borderRadius: BorderRadius.circular(8),
-                child: SizedBox(width: width, height: h, child: _WidePic(item.art)),
+                child: SizedBox(width: width - 10, height: h, child: _WidePic(item.art)),
               )
             else
               Pic(item.art, size: width - 10, radius: 8, round: round, icon: round ? Icons.person_rounded : null),
@@ -709,16 +719,19 @@ class CardRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // videos get wider cards; the row is as high as its tallest card: the picture, the gap, two lines
+    // of title and one under it (in the size the phone sets the letters to), and the padding round it
     final video = items.isNotEmpty && items.every((i) => i.kind == Kind.video);
+    final card = video ? width * 1.35 : width;
+    final picture = items.any((i) => i.kind != Kind.video) ? card - 10 : (card - 10) * 9 / 16;
     final scale = MediaQuery.textScalerOf(context).scale(1);
-    final height = (video ? width * 9 / 16 : width) + 66 * scale;
     return SizedBox(
-      height: height,
+      height: picture + 18 + 52 * scale,
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 12),
         itemCount: items.length,
-        itemBuilder: (_, k) => ItemCard(items[k], width: video ? width * 1.35 : width, list: items),
+        itemBuilder: (_, k) => ItemCard(items[k], width: card, list: items),
       ),
     );
   }
