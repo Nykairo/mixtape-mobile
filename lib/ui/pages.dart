@@ -25,11 +25,24 @@ class ColorTop extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(children: [
-      AnimatedContainer(
-        duration: const Duration(milliseconds: 500),
-        height: height,
-        decoration: BoxDecoration(gradient: fadeFrom(color ?? Look.side, strength: color == null ? 0.4 : 0.85)),
+    // as tall as what's in it, and a little further down behind the keys under it ([height] is how far
+    // the color reaches at most), so no empty band opens up on a narrow phone
+    return Stack(clipBehavior: Clip.none, children: [
+      Positioned(
+        left: 0,
+        right: 0,
+        top: 0,
+        bottom: -72,
+        child: LayoutBuilder(
+          builder: (context, room) => Align(
+            alignment: Alignment.topCenter,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
+              height: min(room.maxHeight, height + 72),
+              decoration: BoxDecoration(gradient: fadeFrom(color ?? Look.side, strength: color == null ? 0.4 : 0.85)),
+            ),
+          ),
+        ),
       ),
       child,
     ]);

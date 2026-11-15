@@ -13,6 +13,7 @@ import '../look.dart';
 import '../model.dart';
 import '../music.dart';
 import '../phone.dart';
+import 'bars.dart';
 import 'pages.dart';
 import 'settings_page.dart';
 import 'shell.dart';
@@ -137,66 +138,68 @@ class _HomePageState extends State<HomePage> {
         final empty = tapes.isEmpty && lib.recent.isEmpty && lib.liked.isEmpty;
         final feed = _feed;
         return Scaffold(
-          body: RefreshIndicator(
-            color: Look.accent,
-            backgroundColor: Look.raised,
-            onRefresh: () => _load(fresh: true),
-            child: CustomScrollView(slivers: [
-              const _TopBar(),
-              if (feed != null && feed.chips.isNotEmpty)
-                SliverToBoxAdapter(
-                  child: SizedBox(
-                    height: 50,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.fromLTRB(14, 6, 14, 8),
-                      children: [
-                        for (final (name, params) in feed.chips)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: _Chip(name, on: _chip == name, onTap: () => _pickChip(name, params)),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              if (_chip.isNotEmpty) ..._moodShelves() else ...[
-                if (empty) const SliverToBoxAdapter(child: _Welcome()),
-                if (!empty) SliverToBoxAdapter(child: _Shortcuts(hello: _hello())),
-                if (!empty) const SliverToBoxAdapter(child: _BackgroundTip()),
-                if (_picks.isNotEmpty) ...[
-                  const SliverToBoxAdapter(child: SectionTitle('Quick picks', over: 'Start a radio from a song')),
-                  SliverToBoxAdapter(child: _QuickPicks(_picks)),
-                ],
-                if (tapes.isNotEmpty || lib.liked.isNotEmpty) ...[
-                  SliverToBoxAdapter(child: SectionTitle('Your tapes', onMore: () => Shell.goTo(3))),
+          body: StatusShade(
+            child: RefreshIndicator(
+              color: Look.accent,
+              backgroundColor: Look.raised,
+              onRefresh: () => _load(fresh: true),
+              child: CustomScrollView(slivers: [
+                const _TopBar(),
+                if (feed != null && feed.chips.isNotEmpty)
                   SliverToBoxAdapter(
                     child: SizedBox(
-                      height: 176,
+                      height: 50,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        padding: const EdgeInsets.fromLTRB(14, 6, 14, 8),
                         children: [
-                          if (lib.liked.isNotEmpty) _LikedTile(onTap: () => Shell.push(const TapePage.liked())),
-                          for (final t in tapes) TapeTile(tape: t, onTap: () => Shell.push(TapePage(tape: t))),
+                          for (final (name, params) in feed.chips)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: _Chip(name, on: _chip == name, onTap: () => _pickChip(name, params)),
+                            ),
                         ],
                       ),
                     ),
                   ),
-                ],
-                SliverToBoxAdapter(child: _Mixes(discover: _discover)),
-                if (lib.recent.length > 2) ...[
-                  const SliverToBoxAdapter(child: SectionTitle('Listen again')),
-                  SliverToBoxAdapter(child: _Again(lib.recent.take(16).toList())),
-                ],
-                if (feed != null)
-                  for (final shelf in feed.shelves) ...[
-                    SliverToBoxAdapter(child: SectionTitle(shelf.title, over: shelf.subtitle)),
-                    SliverToBoxAdapter(child: CardRow(shelf.items)),
+                if (_chip.isNotEmpty) ..._moodShelves() else ...[
+                  if (empty) const SliverToBoxAdapter(child: _Welcome()),
+                  if (!empty) SliverToBoxAdapter(child: _Shortcuts(hello: _hello())),
+                  if (!empty) const SliverToBoxAdapter(child: _BackgroundTip()),
+                  if (_picks.isNotEmpty) ...[
+                    const SliverToBoxAdapter(child: SectionTitle('Quick picks', over: 'Start a radio from a song')),
+                    SliverToBoxAdapter(child: _QuickPicks(_picks)),
                   ],
-              ],
-              SliverToBoxAdapter(child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 20)),
-            ]),
+                  if (tapes.isNotEmpty || lib.liked.isNotEmpty) ...[
+                    SliverToBoxAdapter(child: SectionTitle('Your tapes', onMore: () => Shell.goTo(3))),
+                    SliverToBoxAdapter(
+                      child: SizedBox(
+                        height: 176,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          children: [
+                            if (lib.liked.isNotEmpty) _LikedTile(onTap: () => Shell.push(const TapePage.liked())),
+                            for (final t in tapes) TapeTile(tape: t, onTap: () => Shell.push(TapePage(tape: t))),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                  SliverToBoxAdapter(child: _Mixes(discover: _discover)),
+                  if (lib.recent.length > 2) ...[
+                    const SliverToBoxAdapter(child: SectionTitle('Listen again')),
+                    SliverToBoxAdapter(child: _Again(lib.recent.take(16).toList())),
+                  ],
+                  if (feed != null)
+                    for (final shelf in feed.shelves) ...[
+                      SliverToBoxAdapter(child: SectionTitle(shelf.title, over: shelf.subtitle)),
+                      SliverToBoxAdapter(child: CardRow(shelf.items)),
+                    ],
+                ],
+                SliverToBoxAdapter(child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 20)),
+              ]),
+            ),
           ),
         );
       },

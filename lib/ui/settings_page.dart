@@ -68,16 +68,13 @@ class SettingsPage extends StatelessWidget {
                   style: Look.ui(13.5, color: Look.muted)),
             ),
             const SizedBox(height: 12),
-            SizedBox(
-              height: 76,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                children: [
-                  for (final e in Look.stocks.entries)
-                    _Stock(name: e.key, colors: e.value, on: e.key == Look.stock),
-                ],
-              ),
+            // all of them side by side, however narrow the phone
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              child: Row(children: [
+                for (final e in Look.stocks.entries)
+                  Expanded(child: _Stock(name: e.key, colors: e.value, on: e.key == Look.stock)),
+              ]),
             ),
             const SectionTitle('Playing'),
             SwitchListTile(
@@ -244,7 +241,7 @@ class _Stock extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         onTap: () => App.settings.setStock(name),
         child: Container(
-          width: 84,
+          height: 72,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: Look.side,
@@ -256,7 +253,10 @@ class _Stock extends StatelessWidget {
               for (final c in colors) Expanded(child: Container(height: 10, color: c)),
             ]),
             const SizedBox(height: 8),
-            Text(name, style: Look.ui(13, weight: on ? FontWeight.w700 : FontWeight.w500)),
+            Text(name,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: Look.ui(13, weight: on ? FontWeight.w700 : FontWeight.w500)),
           ]),
         ),
       ),

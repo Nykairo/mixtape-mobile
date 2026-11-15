@@ -10,14 +10,41 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mixtape/ui/bars.dart';
 
 class _Seen {
-  _Seen(this.what, this.rect, this.box);
+  _Seen(this.what, this.rect, this.box, {this.sideways = false});
 
   final String what;
   final Rect rect;
   final RenderBox box;
+
+  /// In a list that scrolls sideways, which goes on past the screen's edge by design.
+  final bool sideways;
 }
+
+bool _inSideways(Element e) {
+  var sideways = false;
+  e.visitAncestorElements((a) {
+    final w = a.widget;
+    if (w is Scrollable && w.axisDirection != AxisDirection.down && w.axisDirection != AxisDirection.up) {
+      sideways = true;
+      return false;
+    }
+    return true;
+  });
+  return sideways;
+}
+
+/// An icon is drawn as a letter of an icon font (from Unicode's private areas): no words to read.
+bool _icon(String s) => s.runes.every((r) => (r >= 0xE000 && r <= 0xF8FF) || r >= 0xF0000 || r == 0x20);
+
+/// Where the app lays its own band over one of the phone's bars (see BarShade).
+List<Rect> _shades() => [
+      for (final e in find.byType(BarShade).evaluate())
+        if ((e.widget as BarShade).visible && e.renderObject is RenderBox && (e.renderObject as RenderBox).hasSize)
+          _global(e.renderObject as RenderBox, Offset.zero & (e.renderObject as RenderBox).size),
+    ];
 
 bool _reaches(WidgetTester tester, Offset at, RenderObject target) {
   final result = HitTestResult();
@@ -45,7 +72,7 @@ List<_Seen> _words(WidgetTester tester) {
     if (local.isEmpty) continue;
     final rect = _global(box, local);
     if (!_reaches(tester, rect.center, box)) continue;
-    out.add(_Seen(text.replaceAll('\n', ' '), rect, box));
+    out.add(_Seen(text.replaceAll('\n', ' '), rect, box, sideways: _inSideways(e)));
   }
   return out;
 }
@@ -87,27 +114,36 @@ List<String> layoutProblems(WidgetTester tester) {
   final keys = Rect.fromLTRB(0, screen.height - bottom, screen.width, screen.height);
   final out = <String>[];
 
+  final shades = _shades();
+  bool shaded(Rect r) => shades.any((s) => s.contains(r.center));
   final words = _words(tester);
   for (var i = 0; i < words.length; i++) {
     final a = words[i];
-    if (a.rect.left < screen.left - 1 || a.rect.right > screen.right + 1) {
+    if (!a.sideways && !_icon(a.what) && (a.rect.left < screen.left - 1 || a.rect.right > screen.right + 1)) {
       out.add('"${_short(a.what)}" runs off the side of the screen');
     }
-    if (top > 0 && a.rect.intersect(status).height > a.rect.height * 0.3) {
+    if (top > 0 && a.rect.intersect(status).height > a.rect.height * 0.3 && !shaded(a.rect.intersect(status))) {
       out.add('"${_short(a.what)}" is under the status bar');
     }
-    if (bottom > 0 && a.rect.intersect(keys).height > a.rect.height * 0.3) {
+    if (bottom > 0 && a.rect.intersect(keys).height > a.rect.height * 0.3 && !shaded(a.rect.intersect(keys))) {
       out.add('"${_short(a.what)}" is under the keys at the bottom');
     }
     for (var j = i + 1; j < words.length; j++) {
       final b = words[j];
       final both = a.rect.intersect(b.rect);
       if (both.isEmpty) continue;
-      final small = math.min(_area(a.rect), _area(b.rect));
       // the same words twice in the same place is a shadow or an outline, drawn on purpose
       if (a.what == b.what && (a.rect.center - b.rect.center).distance < 4) continue;
-      if (_area(both) > math.max(12.0, small * 0.12)) {
-        out.add('"${_short(a.what)}" lies on "${_short(b.what)}"');
+      // letters' boxes are taller than the letters (handwriting most of all): only a real overlap
+      // counts, and only where it can be seen (not where a bar on top covers both)
+      final small = math.min(_area(a.rect), _area(b.rect));
+      final low = math.min(a.rect.height, b.rect.height);
+      if (_area(both) > math.max(12.0, small * 0.3) && both.height > low * 0.4) {
+        final hit = HitTestResult();
+        tester.binding.hitTestInView(hit, both.center, tester.view.viewId);
+        if (hit.path.any((h) => h.target == a.box || h.target == b.box)) {
+          out.add('"${_short(a.what)}" lies on "${_short(b.what)}"');
+        }
       }
     }
   }
@@ -116,8 +152,10 @@ List<String> layoutProblems(WidgetTester tester) {
   for (var i = 0; i < buttons.length; i++) {
     final a = buttons[i];
     final area = _area(a.rect);
-    if (top > 0 && _area(a.rect.intersect(status)) > area * 0.4) out.add('button "${_short(a.what)}" is under the status bar');
-    if (bottom > 0 && _area(a.rect.intersect(keys)) > area * 0.4) {
+    if (top > 0 && _area(a.rect.intersect(status)) > area * 0.4 && !shaded(a.rect.intersect(status))) {
+      out.add('button "${_short(a.what)}" is under the status bar');
+    }
+    if (bottom > 0 && _area(a.rect.intersect(keys)) > area * 0.4 && !shaded(a.rect.intersect(keys))) {
       out.add('button "${_short(a.what)}" is under the keys at the bottom');
     }
     for (var j = i + 1; j < buttons.length; j++) {

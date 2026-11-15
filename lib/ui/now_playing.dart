@@ -620,14 +620,18 @@ class _Sheet extends StatelessWidget {
                     labelStyle: Look.cond(14, spacing: 1.6),
                     tabs: const [Tab(text: 'UP NEXT'), Tab(text: 'LYRICS'), Tab(text: 'RELATED')],
                   ),
+                  // the lists end above the phone's keys, never behind them
                   Expanded(
-                    child: t == null
-                        ? const SizedBox()
-                        : TabBarView(children: [
-                            _UpNext(scroll: scroll),
-                            LyricsView(track: t),
-                            _Related(track: t),
-                          ]),
+                    child: Padding(
+                      padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom),
+                      child: t == null
+                          ? const SizedBox()
+                          : TabBarView(children: [
+                              _UpNext(scroll: scroll),
+                              LyricsView(track: t),
+                              _Related(track: t),
+                            ]),
+                    ),
                   ),
                 ]);
               },

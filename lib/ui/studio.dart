@@ -124,111 +124,114 @@ class _StudioPageState extends State<StudioPage> {
             ),
           ],
         ),
-        body: Column(children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(36, 8, 36, 14),
-            child: ValueListenableBuilder<TextEditingValue>(
-              valueListenable: _note,
-              builder: (context, note, _) => Cassette(
-                title: tape.shownName,
-                slot: _paper,
-                design: preview,
-                layer: App.library.layerOf(tape),
-                sticky: note.text,
-                leftNote: tapeFor(tape.seconds),
-                rightNote: count(tape.songs.length),
-                playing: true,
+        body: SafeArea(
+          top: false,
+          child: Column(children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(36, 8, 36, 14),
+              child: ValueListenableBuilder<TextEditingValue>(
+                valueListenable: _note,
+                builder: (context, note, _) => Cassette(
+                  title: tape.shownName,
+                  slot: _paper,
+                  design: preview,
+                  layer: App.library.layerOf(tape),
+                  sticky: note.text,
+                  leftNote: tapeFor(tape.seconds),
+                  rightNote: count(tape.songs.length),
+                  playing: true,
+                ),
               ),
             ),
-          ),
-          TabBar(
-            indicatorColor: Look.accent,
-            labelColor: Look.cream,
-            unselectedLabelColor: Look.muted,
-            dividerColor: Look.edge,
-            labelStyle: Look.cond(14, spacing: 1.6),
-            tabs: const [Tab(text: 'SHELL'), Tab(text: 'LABEL'), Tab(text: 'REELS'), Tab(text: 'NOTE')],
-          ),
-          Expanded(
-            child: TabBarView(children: [
-              ListView(padding: const EdgeInsets.all(16), children: [
-                _Heading('Color'),
-                _Swatches([
-                  for (final (k, name, c) in _shells)
-                    _Swatch(c, name, (_d['shell'] ?? 'black') == k, () => _set('shell', k == 'black' ? null : k),
-                        see: k == 'clear' || k == 'smoke'),
+            TabBar(
+              indicatorColor: Look.accent,
+              labelColor: Look.cream,
+              unselectedLabelColor: Look.muted,
+              dividerColor: Look.edge,
+              labelStyle: Look.cond(14, spacing: 1.6),
+              tabs: const [Tab(text: 'SHELL'), Tab(text: 'LABEL'), Tab(text: 'REELS'), Tab(text: 'NOTE')],
+            ),
+            Expanded(
+              child: TabBarView(children: [
+                ListView(padding: const EdgeInsets.all(16), children: [
+                  _Heading('Color'),
+                  _Swatches([
+                    for (final (k, name, c) in _shells)
+                      _Swatch(c, name, (_d['shell'] ?? 'black') == k, () => _set('shell', k == 'black' ? null : k),
+                          see: k == 'clear' || k == 'smoke'),
+                  ]),
+                  _Heading('Finish'),
+                  _Choices([
+                    for (final (k, name) in _finishes)
+                      (name, (_d['finish'] ?? 'matte') == k, () => _set('finish', k == 'matte' ? null : k)),
+                  ]),
+                  _Heading('Screws'),
+                  _Swatches([
+                    for (final (k, name, c) in _screws) _Swatch(c, name, _d['screws'] == k, () => _set('screws', k)),
+                    _Swatch(Look.raised, 'None', _d['screws'] == 'none', () => _set('screws', 'none'), none: true),
+                  ]),
                 ]),
-                _Heading('Finish'),
-                _Choices([
-                  for (final (k, name) in _finishes)
-                    (name, (_d['finish'] ?? 'matte') == k, () => _set('finish', k == 'matte' ? null : k)),
+                ListView(padding: const EdgeInsets.all(16), children: [
+                  _Heading('Paper'),
+                  _Swatches([
+                    for (var k = 0; k < papers.length; k++)
+                      _PaperSwatch(k, _paper == k, () => setState(() {
+                            _paper = k;
+                            _changed = true;
+                          })),
+                  ]),
+                  _Heading('Stripes'),
+                  _Choices([
+                    for (final (k, name) in _stripes)
+                      (name, (_d['stripes'] ?? 'classic') == k, () => _set('stripes', k == 'classic' ? null : k)),
+                  ]),
+                  _Heading('Lettering'),
+                  _Choices([
+                    for (final (k, name) in _pens) (name, (_d['pen'] ?? 'hand') == k, () => _set('pen', k == 'hand' ? null : k)),
+                  ]),
+                  _Heading('Ink'),
+                  _Swatches([
+                    _Swatch(paperFor(_paper).$3, "The paper's own", _d['ink'] == null, () => _set('ink', null)),
+                    for (final (k, name, c) in _inks) _Swatch(c, name, _d['ink'] == k, () => _set('ink', k)),
+                  ]),
                 ]),
-                _Heading('Screws'),
-                _Swatches([
-                  for (final (k, name, c) in _screws) _Swatch(c, name, _d['screws'] == k, () => _set('screws', k)),
-                  _Swatch(Look.raised, 'None', _d['screws'] == 'none', () => _set('screws', 'none'), none: true),
+                ListView(padding: const EdgeInsets.all(16), children: [
+                  _Heading('Hubs'),
+                  _Swatches([
+                    _Swatch(Look.raised, 'As the shell', _d['hub'] == null, () => _set('hub', null), none: true),
+                    for (final (k, name, c) in _hubs) _Swatch(c, name, _d['hub'] == k, () => _set('hub', k)),
+                  ]),
+                  _Heading('Tape'),
+                  _Swatches([
+                    for (final (k, name, c) in _tapes)
+                      _Swatch(c, name, (_d['tape'] ?? 'brown') == k, () => _set('tape', k == 'brown' ? null : k)),
+                  ]),
+                ]),
+                ListView(padding: const EdgeInsets.all(16), children: [
+                  _Heading('What it says'),
+                  TextField(
+                    controller: _note,
+                    maxLength: 28,
+                    textCapitalization: TextCapitalization.sentences,
+                    decoration: const InputDecoration(hintText: 'A few words for the corner'),
+                  ),
+                  _Heading('Note color'),
+                  _Swatches([
+                    _Swatch(Look.raised, 'As the paper goes', _d['corner_color'] == null, () => _set('corner_color', null), none: true),
+                    for (final (k, c) in _notes) _Swatch(c, k, _d['corner_color'] == k, () => _set('corner_color', k)),
+                  ]),
+                  SwitchListTile(
+                    contentPadding: EdgeInsets.zero,
+                    value: _d['corner_hidden'] == true,
+                    activeThumbColor: Look.accent,
+                    title: Text('No sticky note', style: Look.ui(15.5)),
+                    onChanged: (on) => _set('corner_hidden', on ? true : null),
+                  ),
                 ]),
               ]),
-              ListView(padding: const EdgeInsets.all(16), children: [
-                _Heading('Paper'),
-                _Swatches([
-                  for (var k = 0; k < papers.length; k++)
-                    _PaperSwatch(k, _paper == k, () => setState(() {
-                          _paper = k;
-                          _changed = true;
-                        })),
-                ]),
-                _Heading('Stripes'),
-                _Choices([
-                  for (final (k, name) in _stripes)
-                    (name, (_d['stripes'] ?? 'classic') == k, () => _set('stripes', k == 'classic' ? null : k)),
-                ]),
-                _Heading('Lettering'),
-                _Choices([
-                  for (final (k, name) in _pens) (name, (_d['pen'] ?? 'hand') == k, () => _set('pen', k == 'hand' ? null : k)),
-                ]),
-                _Heading('Ink'),
-                _Swatches([
-                  _Swatch(paperFor(_paper).$3, "The paper's own", _d['ink'] == null, () => _set('ink', null)),
-                  for (final (k, name, c) in _inks) _Swatch(c, name, _d['ink'] == k, () => _set('ink', k)),
-                ]),
-              ]),
-              ListView(padding: const EdgeInsets.all(16), children: [
-                _Heading('Hubs'),
-                _Swatches([
-                  _Swatch(Look.raised, 'As the shell', _d['hub'] == null, () => _set('hub', null), none: true),
-                  for (final (k, name, c) in _hubs) _Swatch(c, name, _d['hub'] == k, () => _set('hub', k)),
-                ]),
-                _Heading('Tape'),
-                _Swatches([
-                  for (final (k, name, c) in _tapes)
-                    _Swatch(c, name, (_d['tape'] ?? 'brown') == k, () => _set('tape', k == 'brown' ? null : k)),
-                ]),
-              ]),
-              ListView(padding: const EdgeInsets.all(16), children: [
-                _Heading('What it says'),
-                TextField(
-                  controller: _note,
-                  maxLength: 28,
-                  textCapitalization: TextCapitalization.sentences,
-                  decoration: const InputDecoration(hintText: 'A few words for the corner'),
-                ),
-                _Heading('Note color'),
-                _Swatches([
-                  _Swatch(Look.raised, 'As the paper goes', _d['corner_color'] == null, () => _set('corner_color', null), none: true),
-                  for (final (k, c) in _notes) _Swatch(c, k, _d['corner_color'] == k, () => _set('corner_color', k)),
-                ]),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  value: _d['corner_hidden'] == true,
-                  activeThumbColor: Look.accent,
-                  title: Text('No sticky note', style: Look.ui(15.5)),
-                  onChanged: (on) => _set('corner_hidden', on ? true : null),
-                ),
-              ]),
-            ]),
-          ),
-        ]),
+            ),
+          ]),
+        ),
       ),
     );
   }
