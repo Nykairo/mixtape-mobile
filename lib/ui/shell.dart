@@ -112,11 +112,32 @@ class ShellState extends State<Shell> {
               ),
           ],
         ),
-        bottomNavigationBar: Column(mainAxisSize: MainAxisSize.min, children: [
-          if (!samples) const _TogetherStrip(),
-          if (!samples) const MiniPlayer(),
-          _NavBar(tab: _tab, onTap: _go, dark: samples),
-        ]),
+        // Samples plays under a see-through bar; everywhere else the bar is solid, with a short fade
+        // above it, so a list never shows through the tabs or behind the phone's own keys
+        bottomNavigationBar: samples
+            ? _NavBar(tab: _tab, onTap: _go, dark: true)
+            : Column(mainAxisSize: MainAxisSize.min, children: [
+                IgnorePointer(
+                  child: Container(
+                    height: 14,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Look.bg.withValues(alpha: 0), Look.bg],
+                      ),
+                    ),
+                  ),
+                ),
+                ColoredBox(
+                  color: Look.bg,
+                  child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    const _TogetherStrip(),
+                    const MiniPlayer(),
+                    _NavBar(tab: _tab, onTap: _go, dark: false),
+                  ]),
+                ),
+              ]),
       ),
     );
   }
@@ -146,7 +167,7 @@ class _NavBar extends StatelessWidget {
           end: Alignment.bottomCenter,
           colors: dark
               ? [Colors.black.withValues(alpha: 0.0), Colors.black.withValues(alpha: 0.85)]
-              : [Look.bg.withValues(alpha: 0.88), Look.bg],
+              : [Look.bg, Look.bg],
         ),
       ),
       child: Padding(

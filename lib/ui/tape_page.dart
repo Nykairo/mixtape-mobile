@@ -325,15 +325,18 @@ class _EditOrderState extends State<EditOrder> {
         title: Text('Change the order', style: Look.ui(18, weight: FontWeight.w700)),
         actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Done'))],
       ),
-      body: ReorderableListView.builder(
-        itemCount: songs.length,
-        onReorderItem: (from, to) => setState(() => App.library.move(widget.tape, from, to)),
-        itemBuilder: (context, k) => ListTile(
-          key: ValueKey('${songs[k].id}-$k'),
-          leading: Cover(songs[k], size: 42),
-          title: Text(songs[k].title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(15)),
-          subtitle: Text(songs[k].artist, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(12.5, color: Look.muted)),
-          trailing: const Icon(Icons.drag_handle_rounded, color: Look.faint),
+      body: SafeArea(
+        top: false,
+        child: ReorderableListView.builder(
+          itemCount: songs.length,
+          onReorderItem: (from, to) => setState(() => App.library.move(widget.tape, from, to)),
+          itemBuilder: (context, k) => ListTile(
+            key: ValueKey('${songs[k].id}-$k'),
+            leading: Cover(songs[k], size: 42),
+            title: Text(songs[k].title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(15)),
+            subtitle: Text(songs[k].artist, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(12.5, color: Look.muted)),
+            trailing: const Icon(Icons.drag_handle_rounded, color: Look.faint),
+          ),
         ),
       ),
     );

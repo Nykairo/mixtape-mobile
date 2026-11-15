@@ -147,18 +147,21 @@ class _TogetherPageState extends State<TogetherPage> {
             surfaceTintColor: Colors.transparent,
             title: Text('Together', style: Look.ui(19, weight: FontWeight.w800)),
           ),
-          body: ListView(
-            padding: EdgeInsets.fromLTRB(16, 4, 16, MediaQuery.paddingOf(context).bottom + 28),
-            children: [
-              if (!App.account.signedIn)
-                ..._signedOut()
-              else if (t.room != null)
-                ..._room(t)
-              else ...[
-                if (t.friend.isNotEmpty) _Along(t),
-                ..._doors(t),
+          body: SafeArea(
+            top: false,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+              children: [
+                if (!App.account.signedIn)
+                  ..._signedOut()
+                else if (t.room != null)
+                  ..._room(t)
+                else ...[
+                  if (t.friend.isNotEmpty) _Along(t),
+                  ..._doors(t),
+                ],
               ],
-            ],
+            ),
           ),
         );
       },

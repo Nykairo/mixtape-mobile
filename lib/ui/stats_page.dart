@@ -50,29 +50,39 @@ class _StatsPageState extends State<StatsPage> {
             title: Text('Your listening', style: Look.ui(19, weight: FontWeight.w800)),
           ),
           body: ListView(padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 24), children: [
-            SizedBox(
-              height: 46,
-              child: ListView(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(14, 4, 14, 6),
-                children: [
-                  for (final (k, n) in const [('week', 'This week'), ('month', 'This month'), ('year', 'This year'), ('all', 'All time')])
-                    Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(n),
-                        selected: _period == k,
-                        showCheckmark: false,
-                        labelStyle: Look.ui(13.5, weight: FontWeight.w600, color: _period == k ? Look.bg : Look.cream),
-                        selectedColor: Look.cream,
-                        backgroundColor: Look.raised,
-                        side: BorderSide.none,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        onSelected: (_) => setState(() => _period = k),
+            // the four spans side by side, the words shrinking a little on the narrowest phones
+            Padding(
+              padding: const EdgeInsets.fromLTRB(11, 4, 11, 6),
+              child: Row(children: [
+                for (final (k, n) in const [('week', 'This week'), ('month', 'This month'), ('year', 'This year'), ('all', 'All time')])
+                  Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 3),
+                      child: Material(
+                        color: _period == k ? Look.cream : Look.raised,
+                        borderRadius: BorderRadius.circular(20),
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(20),
+                          onTap: () => setState(() => _period = k),
+                          child: SizedBox(
+                            height: 36,
+                            child: Center(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 6),
+                                child: FittedBox(
+                                  fit: BoxFit.scaleDown,
+                                  child: Text(n,
+                                      style: Look.ui(13.5,
+                                          weight: FontWeight.w600, color: _period == k ? Look.bg : Look.cream)),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ]),
             ),
             _Totals(s: s, streak: App.history.streak),
             if (s.plays.isNotEmpty) ...[
@@ -526,10 +536,19 @@ class _Card extends StatelessWidget {
       ),
       child: SafeArea(
         child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(28, 60, 28, 40),
-            child: Column(mainAxisSize: MainAxisSize.min, children: children),
-          ),
+          // on a tablet or an unfolded foldable the card is laid out at a phone's width and drawn bigger,
+          // so it fills the screen the way it fills a phone's
+          child: MediaQuery.sizeOf(context).shortestSide >= 520
+              ? Padding(
+                  padding: const EdgeInsets.fromLTRB(28, 60, 28, 40),
+                  child: FittedBox(
+                    child: SizedBox(width: 400, child: Column(mainAxisSize: MainAxisSize.min, children: children)),
+                  ),
+                )
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(28, 60, 28, 40),
+                  child: Column(mainAxisSize: MainAxisSize.min, children: children),
+                ),
         ),
       ),
     );

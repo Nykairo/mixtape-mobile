@@ -254,8 +254,9 @@ class _Browse extends StatelessWidget {
       SliverPadding(
         padding: const EdgeInsets.symmetric(horizontal: 14),
         sliver: SliverGrid.builder(
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
+          // two side by side on a phone, more on an unfolded foldable or a tablet
+          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+            maxCrossAxisExtent: 240,
             mainAxisSpacing: 10,
             crossAxisSpacing: 10,
             childAspectRatio: 1.75,
