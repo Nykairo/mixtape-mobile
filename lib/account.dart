@@ -36,9 +36,10 @@ class AccountError implements Exception {
     'signin': 'Your sign-in ran out. Sign in to your Mixtape Account again.',
     'offline': "Mixtape can't reach its server right now. Check the internet connection.",
     'server': "Mixtape's server had a problem. Try again in a moment.",
+    'room': "That didn't work out.",
   };
 
-  String get message => words[why] ?? words['server']!;
+  String get message => why == 'room' ? (Account.roomWords[detail] ?? words['room']!) : (words[why] ?? words['server']!);
 
   @override
   String toString() => detail.isEmpty ? message : '$message ($detail)';
@@ -348,6 +349,115 @@ class Account {
       }
     }
     return out;
+  }
+
+  // ------------------------------------------------------------ friends, listening along and rooms
+
+  static const roomWords = {
+    'gone': "That room isn't there (anymore). Check the code.",
+    'full': 'That room is full.',
+    'not yours': 'Only the host can do that.',
+    'wait': 'One moment, then try again.',
+    'closed': 'That party is closed for new people.',
+    'self': "That's you.",
+    'nobody': 'No Mixtape Account has that user name.',
+    'private': 'That friend keeps what they play to themselves.',
+  };
+
+  /// One of the account server's functions (the rooms work through them). Their one-word answers
+  /// become an AccountError with that word as its detail.
+  Future<Object?> rpc(String name, Map<String, Object?> args, {Duration timeout = const Duration(seconds: 15)}) async {
+    final (status, data) = await _call('POST', '/rest/v1/rpc/$name', body: args, token: await token(), timeout: timeout);
+    if (status == 200 || status == 204) return data;
+    final word = data is Map ? data['message'] : null;
+    if (word is String && roomWords.containsKey(word)) throw AccountError('room', word);
+    throw _error(status, data);
+  }
+
+  /// Somebody's profile by user name: {id, username, display_name, share_listening}.
+  Future<Map<String, Object?>> profile(String username) async {
+    final rows = await _get('/rest/v1/profiles?username=eq.${Uri.encodeComponent(cleanName(username))}'
+        '&select=id,username,display_name,share_listening');
+    if (rows.isEmpty) throw AccountError('room', 'nobody');
+    return rows.first;
+  }
+
+  /// Profiles by account id (without pictures: they're the big part).
+  Future<Map<String, Map<String, Object?>>> people(Iterable<String> ids) async {
+    final want = {
+      for (final i in ids)
+        if (RegExp(r'^[0-9a-f-]{36}$').hasMatch(i)) i,
+    }.toList();
+    final out = <String, Map<String, Object?>>{};
+    for (var k = 0; k < want.length; k += 40) {
+      final part = want.sublist(k, k + 40 > want.length ? want.length : k + 40).join(',');
+      for (final r in await _get('/rest/v1/profiles?id=in.($part)&select=id,username,display_name,color')) {
+        out['${r['id']}'] = r;
+      }
+    }
+    return out;
+  }
+
+  /// What someone plays right now ({state, updated_at}), or null.
+  Future<Map<String, Object?>?> playing(String uid) async {
+    final rows = await _get('/rest/v1/live?owner=eq.${Uri.encodeComponent(uid)}&select=state,updated_at',
+        timeout: const Duration(seconds: 10));
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  /// What this account plays right now, for friends listening along by name.
+  Future<void> publish(Map<String, Object?> state) async {
+    final s = session;
+    if (s != null) await _put('live', {'owner': s.uid, 'state': state}, 'owner', timeout: const Duration(seconds: 10));
+  }
+
+  /// Nothing plays anymore (only when what the account says came from this phone).
+  Future<void> unpublish(String device) async {
+    final s = session;
+    if (s == null) return;
+    final (status, data) = await _call(
+        'DELETE', '/rest/v1/live?owner=eq.${s.uid}&state->>dev=eq.${Uri.encodeComponent(device)}',
+        token: await token(), timeout: const Duration(seconds: 8));
+    if (status != 200 && status != 204) throw _error(status, data);
+  }
+
+  /// The server's clock, in seconds since 1970.
+  Future<double> serverTime() async {
+    final (status, data) = await _call('POST', '/rest/v1/rpc/server_time', body: const {}, timeout: const Duration(seconds: 6));
+    if (status != 200 || data is! num) throw _error(status, data);
+    return data.toDouble();
+  }
+
+  Future<Map<String, Object?>?> room(String code) async {
+    final rows = await _get('/rest/v1/rooms?code=eq.${Uri.encodeComponent(code)}'
+        '&select=code,kind,name,host,state,version,settings,open');
+    return rows.isEmpty ? null : rows.first;
+  }
+
+  Future<List<Map<String, Object?>>> roomMembers(String code) => _get(
+      '/rest/v1/room_members?code=eq.${Uri.encodeComponent(code)}&select=member,role,joined_at&order=joined_at.asc');
+
+  Future<List<Map<String, Object?>>> roomRequests(String code) =>
+      _get('/rest/v1/room_requests?code=eq.${Uri.encodeComponent(code)}&select=id,member,song,at&order=at.asc');
+
+  Future<void> dropRequest(int id) async {
+    final (status, data) =
+        await _call('DELETE', '/rest/v1/room_requests?id=eq.$id', token: await token(), timeout: const Duration(seconds: 8));
+    if (status != 200 && status != 204) throw _error(status, data);
+  }
+
+  /// Invites to rooms waiting for you, newest first.
+  Future<List<Map<String, Object?>>> invites() async {
+    final s = session;
+    if (s == null) return const [];
+    return _get('/rest/v1/invites?receiver=eq.${s.uid}&select=sender,code,at,kind,room_name&order=at.desc');
+  }
+
+  Future<void> dropInvite(String sender) async {
+    final s = session;
+    if (s == null) return;
+    await _call('DELETE', '/rest/v1/invites?sender=eq.${Uri.encodeComponent(sender)}&receiver=eq.${s.uid}',
+        token: await token(), timeout: const Duration(seconds: 8));
   }
 
   void close() => _http.close();

@@ -33,6 +33,18 @@ class Library extends ChangeNotifier {
   /// What played lately, newest first.
   final List<Track> recent = [];
 
+  /// Albums, playlists and artists opened lately, newest first (for Home's shortcuts).
+  final List<Map<String, Object?>> opened = [];
+
+  /// What was searched for lately, newest first.
+  final List<String> searches = [];
+
+  /// Tapes pinned to the top of the library, in the order they were pinned ('' is Liked songs).
+  final List<String> pinned = [];
+
+  /// Songs the person isn't interested in: mixes, radios, Quick picks and Samples leave them out.
+  final Map<String, Track> hidden = {};
+
   late final LaterSave _save;
   late final LaterSave _saveSync;
 
@@ -67,6 +79,19 @@ class Library extends ChangeNotifier {
         final track = Track.fromJson(x);
         if (track != null) recent.add(track);
       }
+      for (final x in j['opened'] is List ? j['opened'] as List : const []) {
+        if (x is Map && x['id'] is String) opened.add(Map<String, Object?>.from(x));
+      }
+      for (final x in j['searches'] is List ? j['searches'] as List : const []) {
+        if (x is String) searches.add(x);
+      }
+      for (final x in j['pinned'] is List ? j['pinned'] as List : const []) {
+        if (x is String) pinned.add(x);
+      }
+      for (final x in j['hidden'] is List ? j['hidden'] as List : const []) {
+        final track = Track.fromJson(x);
+        if (track != null) hidden[track.id] = track;
+      }
     }
     final s = await Store.the.read(_syncFile);
     if (s is Map) {
@@ -89,6 +114,10 @@ class Library extends ChangeNotifier {
         'tapes': {for (final e in tapes.entries) e.key: e.value.toJson()},
         'liked': [for (final t in liked) t.toJson()],
         'recent': [for (final t in recent) t.toJson()],
+        'opened': opened,
+        'searches': searches,
+        'pinned': pinned,
+        'hidden': [for (final t in hidden.values) t.toJson()],
       };
 
   Object? _dumpSync() => {
@@ -199,6 +228,7 @@ class Library extends ChangeNotifier {
   Tape rename(Tape tape, String name) {
     final wanted = name.trim();
     if (wanted.isEmpty || wanted == tape.name) return tape;
+    final wasPinned = pinned.indexOf(tape.name);
     final fresh = Tape(
         name: freeName(wanted), songs: tape.songs, note: tape.note, paper: tape.paper, design: tape.design, extra: tape.extra);
     final order = [for (final n in tapes.keys) n == tape.name ? fresh.name : n];
@@ -206,6 +236,7 @@ class Library extends ChangeNotifier {
     tapes
       ..clear()
       ..addEntries(order.map((n) => MapEntry(n, all[n]!)));
+    if (wasPinned >= 0) pinned[wasPinned] = fresh.name;
     _changed();
     return fresh;
   }
@@ -221,6 +252,69 @@ class Library extends ChangeNotifier {
     recent.insert(0, t);
     if (recent.length > _recentMax) recent.removeRange(_recentMax, recent.length);
     _changed(sync: false);
+  }
+
+  // ------------------------------------------------------------ what was opened, searched, pinned, hidden
+
+  /// An album, a playlist or an artist was opened: it goes to the front of Home's shortcuts.
+  void openedItem(Map<String, Object?> item) {
+    opened.removeWhere((x) => x['id'] == item['id']);
+    opened.insert(0, item);
+    if (opened.length > 12) opened.removeRange(12, opened.length);
+    _changed(sync: false);
+  }
+
+  void searched(String q) {
+    final text = q.trim();
+    if (text.isEmpty) return;
+    searches.removeWhere((x) => x.toLowerCase() == text.toLowerCase());
+    searches.insert(0, text);
+    if (searches.length > 20) searches.removeRange(20, searches.length);
+    _changed(sync: false);
+  }
+
+  void forgetSearch([String? q]) {
+    if (q == null) {
+      searches.clear();
+    } else {
+      searches.remove(q);
+    }
+    _changed(sync: false);
+  }
+
+  bool isPinned(String name) => pinned.contains(name);
+
+  void pin(String name, bool on) {
+    pinned.remove(name);
+    if (on) pinned.add(name);
+    _changed(sync: false);
+  }
+
+  bool isHidden(Track t) => hidden.containsKey(t.id);
+
+  /// Not interested in a song (or interested again).
+  void hide(Track t, bool on) {
+    if (on) {
+      hidden[t.id] = t;
+      while (hidden.length > 2000) {
+        hidden.remove(hidden.keys.first);
+      }
+    } else {
+      hidden.remove(t.id);
+    }
+    _changed(sync: false);
+  }
+
+  /// A tape's new look from the tape studio (the computer's stickers and photos on it stay).
+  void setDesign(Tape tape, Map<String, Object?> design, {int? paper}) {
+    final keep = tape.design ?? const {};
+    tape.design = {
+      for (final e in keep.entries)
+        if (const {'items', 'layer'}.contains(e.key)) e.key: e.value,
+      ...design,
+    };
+    if (paper != null) tape.paper = paper;
+    _changed();
   }
 
   // ------------------------------------------------------------ the account
