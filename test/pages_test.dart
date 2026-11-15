@@ -289,9 +289,10 @@ void main() {
     expect(find.text('Samples'), findsWidgets);
     expect(find.text('Not for me'), findsWidgets);
     await shot(tester, 'samples');
+    // leaving the tab stops the samples; that runs on both clocks, so it gets a few more rounds
     Shell.goTo(0);
-    await wait(tester);
-    await tester.runAsync(() => App.samples.stop().timeout(const Duration(seconds: 20)));
+    await wait(tester, rounds: 12);
+    expect(App.samples.player.playing, isFalse, reason: 'Samples stops when its tab is left');
     await close(tester);
   });
 

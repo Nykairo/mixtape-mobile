@@ -43,6 +43,9 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 context.startActivity(chooser)
                 result.success(null)
             }
+            "phone" -> result.success(Phone.about(context))
+            "askBatteryFree" -> result.success(Phone.askBatteryFree(context))
+            "makerSettings" -> result.success(Phone.openMakerSettings(context))
             "widget" -> {
                 NowPlayingWidget.show(
                     context,

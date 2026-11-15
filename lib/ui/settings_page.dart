@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 
 import '../app.dart';
 import '../look.dart';
+import '../phone.dart';
 import 'pages.dart';
 import 'shell.dart';
 import 'sign_in.dart';
@@ -89,6 +90,10 @@ class SettingsPage extends StatelessWidget {
                 App.audio.autoplay = on;
               },
             ),
+            if (Platform.isAndroid) ...[
+              const SectionTitle('With the screen off'),
+              ListenableBuilder(listenable: PhoneInfo.the, builder: (context, _) => const _Background()),
+            ],
             const SectionTitle('Together'),
             SwitchListTile(
               value: App.settings.shareListening,
@@ -96,8 +101,10 @@ class SettingsPage extends StatelessWidget {
               title: Text('Friends can listen along', style: Look.ui(15.5)),
               subtitle: Text(
                 s == null
-                    ? 'With a Mixtape Account, a friend who knows your user name hears what plays here.'
-                    : 'A friend who types @${s.username} hears what plays here, at the same second.',
+                    ? 'With a Mixtape Account, a friend who knows your user name hears what plays here. '
+                        'Mixtape on your computer then shows it on your Discord too.'
+                    : 'A friend who types @${s.username} hears what plays here, at the same second. '
+                        'Mixtape on your computer shows it on your Discord too.',
                 style: Look.ui(13, color: Look.muted, height: 1.35),
               ),
               onChanged: (on) {
@@ -184,6 +191,41 @@ class SettingsPage extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// Music with the screen off: whether Android's battery saving leaves Mixtape alone, and on phones whose
+/// maker adds a battery manager of its own, where to let Mixtape off there too.
+class _Background extends StatelessWidget {
+  const _Background();
+
+  @override
+  Widget build(BuildContext context) {
+    final p = PhoneInfo.the;
+    return Column(children: [
+      if (p.batteryFree)
+        ListTile(
+          leading: const Icon(Icons.battery_full_rounded, color: Look.muted),
+          title: Text('Battery saving leaves Mixtape alone', style: Look.ui(15.5)),
+          subtitle: Text('The music keeps going with the screen off.', style: Look.ui(13, color: Look.muted)),
+        )
+      else
+        ListTile(
+          leading: Icon(Icons.battery_alert_rounded, color: Look.accent),
+          title: Text('Let the music play with the screen off', style: Look.ui(15.5)),
+          subtitle: Text("Android's battery saving can stop it after a while. One tap asks it not to.",
+              style: Look.ui(13, color: Look.muted, height: 1.35)),
+          onTap: p.askBatteryFree,
+        ),
+      if (p.isStrict)
+        ListTile(
+          leading: const Icon(Icons.tune_rounded, color: Look.muted),
+          title: Text('${p.name} settings', style: Look.ui(15.5)),
+          subtitle: Text(p.tip, style: Look.ui(13, color: Look.muted, height: 1.35)),
+          trailing: const Icon(Icons.open_in_new_rounded, size: 18, color: Look.muted),
+          onTap: p.openMakerSettings,
+        ),
+    ]);
   }
 }
 

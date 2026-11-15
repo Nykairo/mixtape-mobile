@@ -67,6 +67,37 @@ class MixtapeNative {
     }
   }
 
+  /// The phone: its maker (one word: 'xiaomi' also for Redmi and POCO, 'transsion' for Tecno, Infinix
+  /// and itel), brand and model, the Android version, whether battery saving leaves Mixtape alone
+  /// ('batteryFree') and whether memory is short ('lowRam'). Empty where there's no Android side.
+  static Future<Map<String, Object?>> phone() async {
+    try {
+      final got = await _channel.invokeMethod<Map<Object?, Object?>>('phone');
+      return {for (final e in (got ?? const <Object?, Object?>{}).entries) '${e.key}': e.value};
+    } on MissingPluginException {
+      return const {};
+    } on PlatformException {
+      return const {};
+    }
+  }
+
+  /// Asks Android, with its own little dialog, to leave Mixtape out of battery saving.
+  static Future<bool> askBatteryFree() => _yes('askBatteryFree');
+
+  /// Opens the maker's own page for apps in the background (Autostart on a Xiaomi, App launch on a
+  /// Huawei, ...), or Mixtape's page in Settings where the maker has none.
+  static Future<bool> openMakerSettings() => _yes('makerSettings');
+
+  static Future<bool> _yes(String method) async {
+    try {
+      return await _channel.invokeMethod<bool>(method) ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
   /// Tells the home screen widget what plays. [art] is a picture file on the phone ('' for none).
   static Future<void> widget({
     required String title,

@@ -6,6 +6,7 @@
     android:minHeight="100dp"
     android:minResizeWidth="180dp"
     android:minResizeHeight="80dp"
+    android:previewImage="@drawable/mixtape_widget_preview"
     android:previewLayout="@layout/mixtape_widget"
     android:resizeMode="horizontal|vertical"
     android:targetCellWidth="4"

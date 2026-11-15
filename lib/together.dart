@@ -550,6 +550,8 @@ class Together extends ChangeNotifier {
       'playing': p.playing && !loading,
       'at': (now() * 100).round() / 100,
       'dev': device,
+      'on': 'phone', // Mixtape on the computer shows this on Discord, "on the phone"
+      if (t.art.startsWith('https://') && t.art.length <= 256) 'art': t.art,
       if (loading) 'loading': true,
       if (p.speed != 1.0) 'speed': p.speed,
       if (next != null && next.src == 'yt')

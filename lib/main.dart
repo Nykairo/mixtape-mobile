@@ -14,6 +14,7 @@ import 'downloads.dart';
 import 'history.dart';
 import 'library.dart';
 import 'look.dart';
+import 'phone.dart';
 import 'settings.dart';
 import 'store.dart';
 import 'together.dart';
@@ -31,6 +32,13 @@ Future<void> main() async {
   final history = History();
   await history.load();
   await Downloads.the.load(); // before the music: saved songs play from their files
+  await PhoneInfo.the.load();
+  if (PhoneInfo.the.lowRam) {
+    // a phone with little memory keeps fewer covers decoded (one that's needed again is fetched again)
+    PaintingBinding.instance.imageCache
+      ..maximumSize = 300
+      ..maximumSizeBytes = 48 << 20;
+  }
   final audio = await AudioService.init(
     builder: MixtapeAudio.new,
     config: AudioServiceConfig(
@@ -75,12 +83,29 @@ class MixtapeApp extends StatefulWidget {
 
 class _MixtapeAppState extends State<MixtapeApp> with WidgetsBindingObserver {
   DateTime _away = DateTime.now();
+  bool? _big;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _turning();
   }
+
+  /// Phones stay upright, like the music apps next to them; a tablet or an unfolded foldable turns with
+  /// the hand. (Folding one up again puts it back upright.)
+  void _turning() {
+    final views = WidgetsBinding.instance.platformDispatcher.views;
+    if (views.isEmpty) return;
+    final v = views.first;
+    final big = v.physicalSize.shortestSide / v.devicePixelRatio >= 600;
+    if (big == _big) return;
+    _big = big;
+    SystemChrome.setPreferredOrientations(big ? const [] : const [DeviceOrientation.portraitUp]);
+  }
+
+  @override
+  void didChangeMetrics() => _turning();
 
   @override
   void dispose() {
