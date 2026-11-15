@@ -279,8 +279,8 @@ void main() {
   testWidgets('Samples: one song on the whole screen', (tester) async {
     await pumpApp(tester);
     await tester.runAsync(() async {
-      await App.samples.more();
-      if (App.samples.items.isNotEmpty) await App.samples.show(0);
+      await App.samples.more().timeout(const Duration(seconds: 20));
+      if (App.samples.items.isNotEmpty) await App.samples.show(0).timeout(const Duration(seconds: 20));
     });
     expect(App.samples.items, isNotEmpty, reason: 'the radio of the liked songs filled the feed');
     Shell.goTo(1);
@@ -290,7 +290,7 @@ void main() {
     await shot(tester, 'samples');
     Shell.goTo(0);
     await wait(tester);
-    await tester.runAsync(App.samples.stop);
+    await tester.runAsync(() => App.samples.stop().timeout(const Duration(seconds: 20)));
     await close(tester);
   });
 

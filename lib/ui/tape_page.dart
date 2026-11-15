@@ -30,7 +30,12 @@ class _TapePageState extends State<TapePage> {
   void initState() {
     super.initState();
     final t = _tape;
-    if (t != null) App.library.openedItem({'kind': 'tape', 'id': t.name, 'title': t.shownName});
+    if (t != null) {
+      // after this frame: the library tells its pages, and they can't be told while one is being built
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        App.library.openedItem({'kind': 'tape', 'id': t.name, 'title': t.shownName});
+      });
+    }
   }
 
   @override
@@ -245,8 +250,13 @@ Future<void> tapeMenu(BuildContext context, Tape tape) {
                 })),
             _row(Icons.sticky_note_2_outlined, 'Write on the sticky note', () => go(() async {
                   final text = await askText(context,
-                      title: 'Sticky note', hint: 'A few words for the corner', start: tape.note, action: 'Stick it on', max: 28);
-                  if (context.mounted) lib.setNote(tape, text ?? '');
+                      title: 'Sticky note',
+                      hint: 'A few words for the corner (none takes it off)',
+                      start: tape.note,
+                      action: 'Stick it on',
+                      max: 28,
+                      blank: true);
+                  if (text != null) lib.setNote(tape, text);
                 })),
             if (tape.songs.length > 1)
               _row(Icons.swap_vert_rounded, 'Change the order', () => go(() => EditOrder.open(context, tape))),
