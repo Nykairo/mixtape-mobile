@@ -81,14 +81,14 @@ class _StatsPageState extends State<StatsPage> {
                 child: Row(children: [
                   Expanded(
                     child: _WrappedButton(
-                      title: 'Wrapped: ${_monthName(DateTime.now().month)}',
+                      title: _monthName(DateTime.now().month),
                       onTap: () => WrappedPage.open(context, 'month'),
                     ),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
                     child: _WrappedButton(
-                      title: 'Wrapped: ${DateTime.now().year}',
+                      title: '${DateTime.now().year}',
                       onTap: () => WrappedPage.open(context, 'year'),
                     ),
                   ),
@@ -284,12 +284,15 @@ class _WrappedButton extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             child: Row(children: [
               const Icon(Icons.auto_awesome_rounded, color: Look.bg),
               const SizedBox(width: 8),
               Expanded(
-                child: Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(14.5, weight: FontWeight.w800, color: Look.bg)),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                  Text('WRAPPED', style: Look.cond(11.5, color: Look.bg, spacing: 1.6)),
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(16, weight: FontWeight.w800, color: Look.bg)),
+                ]),
               ),
             ]),
           ),
