@@ -166,6 +166,7 @@ class _HomePageState extends State<HomePage> {
                   if (empty) const SliverToBoxAdapter(child: _Welcome()),
                   if (!empty) SliverToBoxAdapter(child: _Shortcuts(hello: _hello())),
                   if (!empty) const SliverToBoxAdapter(child: _BackgroundTip()),
+                  if (!empty) const SliverToBoxAdapter(child: _RewindNote()),
                   if (_picks.isNotEmpty) ...[
                     const SliverToBoxAdapter(child: SectionTitle('Quick picks', over: 'Start a radio from a song')),
                     SliverToBoxAdapter(child: _QuickPicks(_picks)),
@@ -274,6 +275,67 @@ class _BackgroundTip extends StatelessWidget {
                 ),
               ]),
             ]),
+          ),
+        );
+      },
+    );
+  }
+}
+
+/// In the first week of a month: last month's Rewind is ready (Settings switches the word off).
+class _RewindNote extends StatelessWidget {
+  const _RewindNote();
+
+  static String _lastMonth() {
+    final now = DateTime.now();
+    final m = DateTime(now.year, now.month - 1);
+    return '${m.year}-${m.month.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: App.settings,
+      builder: (context, _) {
+        final set = App.settings;
+        final month = _lastMonth();
+        if (!set.rewindNote || DateTime.now().day > 7 || set.rewindSeen == month || !lastMonthHasMusic()) {
+          return const SizedBox.shrink();
+        }
+        final name = lastMonthName();
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
+          child: Material(
+            borderRadius: BorderRadius.circular(16),
+            clipBehavior: Clip.antiAlias,
+            child: Ink(
+              decoration: BoxDecoration(gradient: LinearGradient(colors: [Look.stripes[0], Look.stripes[1]])),
+              child: InkWell(
+                onTap: () {
+                  set.setRewindSeen(month);
+                  RewindPage.open(context, 'last');
+                },
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 6, 12),
+                  child: Row(children: [
+                    const Icon(Icons.fast_rewind_rounded, color: Look.bg, size: 30),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('YOUR REWIND IS READY', style: Look.cond(11.5, color: Look.bg, spacing: 1.6)),
+                        Text('$name on Mixtape', maxLines: 1, overflow: TextOverflow.ellipsis,
+                            style: Look.ui(17, weight: FontWeight.w800, color: Look.bg)),
+                      ]),
+                    ),
+                    IconButton(
+                      tooltip: 'Not now',
+                      onPressed: () => set.setRewindSeen(month),
+                      icon: const Icon(Icons.close_rounded, color: Look.bg),
+                    ),
+                  ]),
+                ),
+              ),
+            ),
           ),
         );
       },

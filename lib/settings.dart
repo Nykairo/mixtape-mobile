@@ -29,8 +29,10 @@ class Settings extends ChangeNotifier {
   /// The little clock next to the lyrics that counts down to the next line.
   bool lyricsCountdown = true;
 
-  /// A word on Home early in the month when last month's Rewind is ready.
+  /// A word on Home early in the month when last month's Rewind is ready, and the month ('2026-10')
+  /// whose word was answered already.
   bool rewindNote = true;
+  String rewindSeen = '';
 
   /// The library as a grid of cassettes (or a list), and how it's sorted: 'recent', 'name' or 'songs'.
   bool grid = false;
@@ -49,6 +51,7 @@ class Settings extends ChangeNotifier {
         'albums_whole': albumsWhole,
         'lyrics_countdown': lyricsCountdown,
         'rewind_note': rewindNote,
+        'rewind_seen': rewindSeen,
         'grid': grid,
         'sort': sort,
         'background_tip_done': backgroundTipDone,
@@ -68,6 +71,7 @@ class Settings extends ChangeNotifier {
       albumsWhole = j['albums_whole'] != false;
       lyricsCountdown = j['lyrics_countdown'] != false;
       rewindNote = j['rewind_note'] != false;
+      rewindSeen = '${j['rewind_seen'] ?? ''}';
       grid = j['grid'] == true;
       final order = j['sort'];
       if (order is String && const {'recent', 'name', 'songs'}.contains(order)) sort = order;
@@ -111,6 +115,13 @@ class Settings extends ChangeNotifier {
   void setRewindNote(bool on) {
     if (on == rewindNote) return;
     rewindNote = on;
+    _save.soon();
+    notifyListeners();
+  }
+
+  void setRewindSeen(String month) {
+    if (month == rewindSeen) return;
+    rewindSeen = month;
     _save.soon();
     notifyListeners();
   }

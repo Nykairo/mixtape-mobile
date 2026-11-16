@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import '../app.dart';
 import '../look.dart';
 import '../model.dart';
+import 'add_music.dart';
 import 'shell.dart';
 import 'sign_in.dart';
 import 'tape_page.dart';
@@ -151,9 +152,9 @@ class _LibraryPageState extends State<LibraryPage> {
                       child: SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2)),
                     ),
                   IconButton(
-                    tooltip: 'New tape',
+                    tooltip: 'Add music',
                     icon: const Icon(Icons.add_rounded, color: Look.cream, size: 28),
-                    onPressed: _newTape,
+                    onPressed: () => addMusic(context, newTape: _newTape),
                   ),
                   const SizedBox(width: 4),
                 ],

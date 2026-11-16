@@ -67,5 +67,11 @@
         <receiver
             android:name="dev.softwarevault.mixtape_native.WidgetActions"
             android:exported="false" />
+        <!-- a picture handed to the app it's shared with (SharedFiles) -->
+        <provider
+            android:name="dev.softwarevault.mixtape_native.SharedFiles"
+            android:authorities="${applicationId}.mixtape.shared"
+            android:exported="false"
+            android:grantUriPermissions="true" />
     </application>
 </manifest>

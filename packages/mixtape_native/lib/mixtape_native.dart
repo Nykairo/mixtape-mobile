@@ -69,6 +69,18 @@ class MixtapeNative {
     }
   }
 
+  /// Hands a picture (a PNG file) to the phone's share sheet, with a line of [text] for apps that take
+  /// one: saved to the gallery, sent to a friend, posted. False where there's no share sheet for it.
+  static Future<bool> shareImage(String path, {String text = ''}) async {
+    try {
+      return await _channel.invokeMethod<bool>('shareImage', {'path': path, 'text': text}) ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
   /// The phone: its maker (one word: 'xiaomi' also for Redmi and POCO, 'transsion' for Tecno, Infinix
   /// and itel), brand and model, the Android version, whether battery saving leaves Mixtape alone
   /// ('batteryFree') and whether memory is short ('lowRam'). Empty where there's no Android side.

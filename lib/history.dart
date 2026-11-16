@@ -1,5 +1,5 @@
-/// What you listened to on the phone, song by song with how long, for the listening stats and the Wrapped:
-/// minutes, top songs and artists, the hours you listen at, your streak. A song counts when it played for
+/// What you listened to on the phone, song by song with how long, for the listening stats and Rewind:
+/// minutes, top songs and artists, the hours you listen at, your streaks, the artists new to you. A song counts when it played for
 /// half a minute (or half of it, for a short one), like Spotify counts a stream. Kept in plays.json,
 /// the last 20 000 plays.
 library;
@@ -76,7 +76,7 @@ class Stats {
   List<(String, int)> get artists {
     final time = <String, int>{};
     for (final p in plays) {
-      final a = p.track.artist.split(RegExp(r',| & | feat\. ')).first.trim();
+      final a = firstArtist(p.track.artist);
       if (a.isEmpty) continue;
       time[a] = (time[a] ?? 0) + p.seconds;
     }
@@ -100,6 +100,29 @@ class Stats {
 
   int get distinctArtists => artists.length;
 
+  /// Minutes in each month, January first (for a year's Rewind).
+  List<int> get months {
+    final out = List<int>.filled(12, 0);
+    for (final p in plays) {
+      out[p.when.month - 1] += p.seconds;
+    }
+    return [for (final s in out) (s / 60).round()];
+  }
+
+  /// The most days in a row with music in them.
+  int get longestStreak {
+    final days = {for (final p in plays) DateTime(p.when.year, p.when.month, p.when.day)}.toList()..sort();
+    var best = 0, run = 0;
+    DateTime? last;
+    for (final d in days) {
+      // a day apart, also over a clock change (23 or 25 hours)
+      run = last != null && (d.difference(last).inHours / 24).round() == 1 ? run + 1 : 1;
+      best = max(best, run);
+      last = d;
+    }
+    return best;
+  }
+
   /// The hour you listen most at, or -1.
   int get peakHour {
     final h = hours;
@@ -115,6 +138,9 @@ class Stats {
 }
 
 String _day(DateTime d) => '${d.year}-${d.month}-${d.day}';
+
+/// The first of a song's artists ("A, B & C feat. D" is A's).
+String firstArtist(String artists) => artists.split(RegExp(r',| & | feat\. ')).first.trim();
 
 class History extends ChangeNotifier {
   final List<Play> plays = [];
@@ -149,6 +175,19 @@ class History extends ChangeNotifier {
   }
 
   Stats get all => Stats(plays);
+
+  /// Artists first heard (on this phone) between [from] and [to], the most heard first.
+  List<String> newArtists(DateTime from, DateTime to) {
+    final start = from.millisecondsSinceEpoch ~/ 1000;
+    final before = {
+      for (final p in plays)
+        if (p.at < start) firstArtist(p.track.artist),
+    };
+    return [
+      for (final (name, _) in between(from, to).artists)
+        if (!before.contains(name)) name,
+    ];
+  }
 
   /// Days in a row with music, up to today (or yesterday, when today has none yet).
   int get streak {

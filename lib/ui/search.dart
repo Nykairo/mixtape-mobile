@@ -10,9 +10,11 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../importer.dart';
 import '../look.dart';
 import '../music.dart';
 import '../youtube.dart';
+import 'add_music.dart';
 import 'pages.dart';
 import 'shell.dart';
 import 'widgets.dart';
@@ -79,6 +81,12 @@ class _SearchPageState extends State<SearchPage> {
   void _submit(String text) {
     final q = text.trim();
     if (q.isEmpty) return;
+    if (Importer.isListLink(q)) {
+      // a playlist, an album or a song from Spotify, Deezer or YouTube: read it in, like on the computer
+      _focus.unfocus();
+      Shell.push(ImportPage(start: q));
+      return;
+    }
     _field.value = TextEditingValue(text: q, selection: TextSelection.collapsed(offset: q.length));
     _focus.unfocus();
     App.library.searched(q);

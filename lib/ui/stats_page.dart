@@ -1,14 +1,20 @@
 /// Your listening on the phone: minutes on the tape counter, top songs and artists, the hours you listen
-/// at and your streak; and a Wrapped for the month or the year, told in cards you tap through.
+/// at and your streak; and Rewind, Mixtape's own Wrapped, for this month so far, last month or the
+/// year, told in cards you tap through and ending on a J-card to keep as a tape or share as a picture.
 library;
 
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:mixtape_native/mixtape_native.dart';
 
 import '../app.dart';
 import '../history.dart';
 import '../look.dart';
+import '../model.dart';
+import '../store.dart';
 import 'pages.dart';
 import 'shell.dart';
 import 'widgets.dart';
@@ -19,9 +25,24 @@ import 'widgets.dart';
   return switch (period) {
     'week' => (DateTime(now.year, now.month, now.day).subtract(Duration(days: now.weekday - 1)), end, 'This week'),
     'month' => (DateTime(now.year, now.month), end, 'This month'),
+    // DateTime counts a month 0 as the December before
+    'last' => (DateTime(now.year, now.month - 1), DateTime(now.year, now.month), 'Last month'),
     'year' => (DateTime(now.year), end, 'This year'),
     _ => (DateTime(2000), end, 'All time'),
   };
+}
+
+/// Last month, as the Rewind of it calls it: its name, and the year when it was another one.
+String lastMonthName() {
+  final now = DateTime.now();
+  final m = DateTime(now.year, now.month - 1);
+  return m.year == now.year ? _monthName(m.month) : '${_monthName(m.month)} ${m.year}';
+}
+
+/// Whether last month has enough music in it for a Rewind.
+bool lastMonthHasMusic() {
+  final (from, to, _) = _range('last');
+  return App.history.between(from, to).plays.length >= 5;
 }
 
 class StatsPage extends StatefulWidget {
@@ -85,25 +106,32 @@ class _StatsPageState extends State<StatsPage> {
               ]),
             ),
             _Totals(s: s, streak: App.history.streak),
-            if (s.plays.isNotEmpty) ...[
+            if (s.plays.isNotEmpty || lastMonthHasMusic())
               Padding(
                 padding: const EdgeInsets.fromLTRB(14, 14, 14, 0),
                 child: Row(children: [
                   Expanded(
-                    child: _WrappedButton(
-                      title: _monthName(DateTime.now().month),
-                      onTap: () => WrappedPage.open(context, 'month'),
+                    child: _RewindButton(
+                      title: '${_monthName(DateTime.now().month)} so far',
+                      onTap: () => RewindPage.open(context, 'month'),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  if (lastMonthHasMusic()) ...[
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: _RewindButton(title: lastMonthName(), onTap: () => RewindPage.open(context, 'last')),
+                    ),
+                  ],
+                  const SizedBox(width: 8),
                   Expanded(
-                    child: _WrappedButton(
+                    child: _RewindButton(
                       title: '${DateTime.now().year}',
-                      onTap: () => WrappedPage.open(context, 'year'),
+                      onTap: () => RewindPage.open(context, 'year'),
                     ),
                   ),
                 ]),
               ),
+            if (s.plays.isNotEmpty) ...[
               SectionTitle('Top songs', over: name),
               for (var k = 0; k < min(10, songs.length); k++)
                 NowPlayingBuilder(
@@ -278,8 +306,8 @@ class _Hours extends CustomPainter {
   bool shouldRepaint(_Hours old) => old.hours != hours || old.color != color;
 }
 
-class _WrappedButton extends StatelessWidget {
-  const _WrappedButton({required this.title, required this.onTap});
+class _RewindButton extends StatelessWidget {
+  const _RewindButton({required this.title, required this.onTap});
 
   final String title;
   final VoidCallback onTap;
@@ -294,15 +322,18 @@ class _WrappedButton extends StatelessWidget {
         child: InkWell(
           onTap: onTap,
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            child: Row(children: [
-              const Icon(Icons.auto_awesome_rounded, color: Look.bg),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
-                  Text('WRAPPED', style: Look.cond(11.5, color: Look.bg, spacing: 1.6)),
-                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(16, weight: FontWeight.w800, color: Look.bg)),
-                ]),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+              Row(children: [
+                const Icon(Icons.fast_rewind_rounded, color: Look.bg, size: 16),
+                const SizedBox(width: 4),
+                Text('REWIND', style: Look.cond(11.5, color: Look.bg, spacing: 1.6)),
+              ]),
+              const SizedBox(height: 2),
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerLeft,
+                child: Text(title, maxLines: 1, style: Look.ui(15.5, weight: FontWeight.w800, color: Look.bg)),
               ),
             ]),
           ),
@@ -315,23 +346,24 @@ class _WrappedButton extends StatelessWidget {
 String _monthName(int m) =>
     const ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'][m - 1];
 
-// ---------------------------------------------------------------- Wrapped
+// ---------------------------------------------------------------- Rewind
 
-/// The month or the year in cards: tap the right side for the next, the left for the one before, hold
-/// to stop the clock. Each card moves on by itself after a few seconds.
-class WrappedPage extends StatefulWidget {
-  const WrappedPage({super.key, required this.period});
+/// This month so far, last month or the year in cards: tap the right side for the next, the left for
+/// the one before, hold to stop the clock. Each card moves on by itself after a few seconds, up to the
+/// J-card at the end, which stays.
+class RewindPage extends StatefulWidget {
+  const RewindPage({super.key, required this.period});
 
   final String period;
 
   static Future<void> open(BuildContext context, String period) => Navigator.of(context, rootNavigator: true)
-      .push(MaterialPageRoute<void>(fullscreenDialog: true, builder: (_) => WrappedPage(period: period)));
+      .push(MaterialPageRoute<void>(fullscreenDialog: true, builder: (_) => RewindPage(period: period)));
 
   @override
-  State<WrappedPage> createState() => _WrappedPageState();
+  State<RewindPage> createState() => _RewindPageState();
 }
 
-class _WrappedPageState extends State<WrappedPage> with SingleTickerProviderStateMixin {
+class _RewindPageState extends State<RewindPage> with SingleTickerProviderStateMixin {
   late final AnimationController _clock = AnimationController(vsync: this, duration: const Duration(seconds: 6))
     ..addStatusListener((s) {
       if (s == AnimationStatus.completed) _go(1);
@@ -339,13 +371,21 @@ class _WrappedPageState extends State<WrappedPage> with SingleTickerProviderStat
   int _card = 0;
   late final Stats _s;
   late final String _when;
+  late final List<String> _new;
+  final _jcard = GlobalKey();
+  bool _sharing = false;
 
   @override
   void initState() {
     super.initState();
     final (from, to, _) = _range(widget.period);
     _s = App.history.between(from, to);
-    _when = widget.period == 'year' ? '${DateTime.now().year}' : _monthName(DateTime.now().month);
+    _new = App.history.newArtists(from, to);
+    _when = switch (widget.period) {
+      'year' => '${DateTime.now().year}',
+      'last' => lastMonthName(),
+      _ => _monthName(DateTime.now().month),
+    };
     _clock.forward();
   }
 
@@ -369,13 +409,16 @@ class _WrappedPageState extends State<WrappedPage> with SingleTickerProviderStat
                 : peak < 17
                     ? ('Daytime listener', 'Your music keeps you company through the day.')
                     : ('Evening listener', 'Your music comes out after work.');
+    final streak = s.longestStreak;
+    final months = s.months;
+    final busiest = months.reduce(max);
     return [
       _Card(colors: [Look.stripes[0], const Color(0xFF3B1D0E)], children: [
         Text('YOUR', style: Look.cond(22, color: Look.cream, spacing: 6)),
-        Text(_when, style: Look.hand(72, color: Look.cream)),
-        Text('on Mixtape', style: Look.ui(22, weight: FontWeight.w800)),
+        FittedBox(fit: BoxFit.scaleDown, child: Text(_when, style: Look.hand(72, color: Look.cream))),
+        Text(widget.period == 'month' ? 'so far, on Mixtape' : 'on Mixtape', style: Look.ui(22, weight: FontWeight.w800)),
         const SizedBox(height: 28),
-        const SizedBox(width: 240, child: TapeArtPlain(title: 'wrapped', playing: true, sticky: 'rewind!')),
+        const SizedBox(width: 240, child: TapeArtPlain(title: 'rewind', playing: true, sticky: 'rewind!')),
       ]),
       _Card(colors: const [Color(0xFF25428E), Look.bg], children: [
         Text('You listened for', style: Look.ui(22, weight: FontWeight.w700)),
@@ -402,6 +445,22 @@ class _WrappedPageState extends State<WrappedPage> with SingleTickerProviderStat
           const SizedBox(height: 26),
           for (var k = 1; k < min(5, artists.length); k++)
             Text('${k + 1}.  ${artists[k].$1}', style: Look.ui(17, weight: FontWeight.w600)),
+        ]),
+      if (_new.isNotEmpty)
+        _Card(colors: const [Color(0xFF8C4A1E), Look.bg], children: [
+          Text(_new.length == 1 ? 'One artist was' : '${_new.length} artists were', style: Look.ui(22, weight: FontWeight.w800)),
+          Text('new to you', style: Look.hand(54, color: Look.cream)),
+          const SizedBox(height: 22),
+          for (final name in _new.take(5))
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 3),
+              child: Text(name, textAlign: TextAlign.center, style: Look.ui(19, weight: FontWeight.w700)),
+            ),
+          if (_new.length > 5)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Text('and ${_new.length - 5} more', style: Look.ui(15, color: Look.cream.withValues(alpha: 0.75))),
+            ),
         ]),
       if (songs.isNotEmpty)
         _Card(colors: const [Color(0xFF1F6B52), Look.bg], children: [
@@ -443,35 +502,112 @@ class _WrappedPageState extends State<WrappedPage> with SingleTickerProviderStat
           const SizedBox(height: 12),
           Text(owlWords, textAlign: TextAlign.center, style: Look.ui(16, color: Look.cream.withValues(alpha: 0.8), height: 1.4)),
         ]),
-      _Card(colors: [Look.stripes[1], const Color(0xFF3B1D0E)], children: [
-        Text('That was $_when.', style: Look.ui(28, weight: FontWeight.w900)),
-        const SizedBox(height: 10),
-        Text('${s.distinctSongs} songs, ${s.distinctArtists} artists, ${s.days} days of music.',
-            textAlign: TextAlign.center, style: Look.ui(16, color: Look.cream.withValues(alpha: 0.85))),
-        const SizedBox(height: 26),
-        if (songs.isNotEmpty)
-          FilledButton.icon(
-            onPressed: () {
-              final list = [for (final x in songs.take(30)) x.$1];
-              Navigator.of(context).pop();
-              Shell.push(MixView(title: 'Wrapped $_when', blurb: 'your most played', songs: list, slot: 5));
-            },
-            icon: const Icon(Icons.queue_music_rounded),
-            label: const Text('Your top songs as a tape'),
+      if (streak >= 2)
+        _Card(colors: const [Color(0xFF9E2B25), Look.bg], children: [
+          Text('Your longest streak', style: Look.ui(20, weight: FontWeight.w700)),
+          const SizedBox(height: 16),
+          Counter('$streak'.padLeft(2, '0'), height: 72, color: Look.cream),
+          const SizedBox(height: 12),
+          Text('days in a row', style: Look.hand(46, color: Look.cream)),
+          const SizedBox(height: 12),
+          Text(streak >= 7 ? 'Not one day without music.' : 'Music, day after day.',
+              style: Look.ui(16, color: Look.cream.withValues(alpha: 0.8))),
+        ]),
+      if (widget.period == 'year' && months.where((m) => m > 0).length >= 2)
+        _Card(colors: const [Color(0xFF2D4F7C), Look.bg], children: [
+          Text('Your months', style: Look.ui(24, weight: FontWeight.w900)),
+          const SizedBox(height: 22),
+          SizedBox(
+            height: 200,
+            child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              for (var k = 0; k < 12; k++)
+                Expanded(
+                  child: Column(mainAxisAlignment: MainAxisAlignment.end, children: [
+                    Container(
+                      height: busiest == 0 ? 0 : 170 * months[k] / busiest,
+                      margin: const EdgeInsets.symmetric(horizontal: 3),
+                      decoration: BoxDecoration(
+                        color: months[k] == busiest ? Look.stripes[0] : Look.cream.withValues(alpha: 0.75),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(_monthName(k + 1)[0], style: Look.ui(12.5, weight: FontWeight.w700)),
+                  ]),
+                ),
+            ]),
           ),
+          const SizedBox(height: 18),
+          if (busiest > 0)
+            Text('${_monthName(months.indexOf(busiest) + 1)} was the loudest: $busiest minutes.',
+                textAlign: TextAlign.center, style: Look.ui(16, color: Look.cream.withValues(alpha: 0.85))),
+        ]),
+      _Card(colors: [Look.stripes[1], const Color(0xFF3B1D0E)], children: [
+        RepaintBoundary(
+          key: _jcard,
+          child: JCard(
+            title: _when,
+            songs: [for (final x in songs.take(10)) x.$1],
+            minutes: s.minutes,
+            topArtist: artists.isEmpty ? '' : artists.first.$1,
+            streak: streak,
+          ),
+        ),
+        const SizedBox(height: 22),
+        Wrap(alignment: WrapAlignment.center, spacing: 10, runSpacing: 10, children: [
+          if (songs.isNotEmpty)
+            FilledButton.icon(
+              onPressed: () {
+                final list = [for (final x in songs.take(30)) x.$1];
+                final tape = App.library.newTape('Rewind $_when', songs: list);
+                Navigator.of(context).pop();
+                Shell.push(MixView(title: tape.shownName, blurb: 'your most played', songs: list, slot: 5));
+              },
+              icon: const Icon(Icons.queue_music_rounded),
+              label: const Text('Make it a tape'),
+            ),
+          FilledButton.tonalIcon(
+            onPressed: _sharing ? null : _share,
+            icon: const Icon(Icons.ios_share_rounded),
+            label: const Text('Share the card'),
+          ),
+        ]),
       ]),
     ];
+  }
+
+  /// The J-card as a picture, handed to the share sheet (save it, send it, post it).
+  Future<void> _share() async {
+    final box = _jcard.currentContext?.findRenderObject();
+    if (box is! RenderRepaintBoundary) return;
+    setState(() => _sharing = true);
+    _clock.stop();
+    try {
+      final image = await box.toImage(pixelRatio: 3);
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (png == null) return;
+      final file = Store.the.file('rewind-${_when.replaceAll(' ', '-').toLowerCase()}.png');
+      await file.writeAsBytes(png.buffer.asUint8List(), flush: true);
+      final shared = await MixtapeNative.shareImage(file.path, text: 'My $_when on Mixtape');
+      if (!shared && mounted) say(context, 'The picture is on the phone, in Mixtape\'s folder: ${file.path}');
+    } on Object {
+      if (mounted) say(context, "Couldn't make the picture this time.");
+    } finally {
+      if (mounted) setState(() => _sharing = false);
+    }
   }
 
   void _go(int step) {
     final n = _cards.length;
     final next = _card + step;
-    if (next >= n) {
-      Navigator.of(context).maybePop();
-      return;
-    }
+    if (next >= n) return; // the J-card stays until it's closed
     setState(() => _card = max(0, next));
-    _clock.forward(from: 0);
+    if (_card == n - 1) {
+      _clock.value = 1; // the last card: its bar full, no clock running
+    } else {
+      _clock.forward(from: 0);
+    }
   }
 
   @override
@@ -513,6 +649,107 @@ class _WrappedPageState extends State<WrappedPage> with SingleTickerProviderStat
                 ),
               ]),
             ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
+/// A J-card, the paper in a cassette's case: the stripes, REWIND and the month or year by hand, the
+/// top ten songs written down the inside, and the numbers along the bottom. Drawn on its own so it can
+/// become a picture.
+class JCard extends StatelessWidget {
+  const JCard({super.key, required this.title, required this.songs, required this.minutes, required this.topArtist, required this.streak});
+
+  final String title;
+  final List<Track> songs;
+  final int minutes;
+  final String topArtist;
+  final int streak;
+
+  static const _paper = Color(0xFFF6EEDC);
+
+  @override
+  Widget build(BuildContext context) {
+    final stripes = Look.stripes;
+    return Container(
+      width: 300,
+      decoration: BoxDecoration(
+        color: _paper,
+        borderRadius: BorderRadius.circular(6),
+        boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 18, offset: Offset(0, 8))],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: IntrinsicHeight(
+        child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          // the spine, with the fold beside it
+          Container(
+            width: 34,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEDE2CB),
+              border: Border(right: BorderSide(color: Look.ink.withValues(alpha: 0.18))),
+            ),
+            child: RotatedBox(
+              quarterTurns: 3,
+              child: Center(
+                child: Text('REWIND  ·  ${title.toUpperCase()}',
+                    maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.cond(12, color: Look.ink, spacing: 2.4)),
+              ),
+            ),
+          ),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+              for (final (k, h) in const [(0, 7.0), (1, 5.0), (2, 3.5)])
+                Container(height: h, color: stripes[k % stripes.length]),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 12, 14, 6),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('REWIND', style: Look.cond(13, color: Look.ink, spacing: 3)),
+                  FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerLeft,
+                    child: Text(title, style: Look.hand(40, color: Look.ink)),
+                  ),
+                  Container(height: 1.2, color: Look.ink.withValues(alpha: 0.35), margin: const EdgeInsets.only(bottom: 8)),
+                  for (var k = 0; k < songs.length; k++)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 1),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        SizedBox(width: 22, child: Text('${k + 1}', style: Look.hand(17, color: Look.ink.withValues(alpha: 0.6)))),
+                        Expanded(
+                          child: Text(
+                            songs[k].artist.isEmpty ? songs[k].title : '${songs[k].title} - ${firstArtist(songs[k].artist)}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: Look.hand(17, color: Look.ink),
+                          ),
+                        ),
+                      ]),
+                    ),
+                  if (songs.isEmpty) Text('a quiet one', style: Look.hand(20, color: Look.ink.withValues(alpha: 0.6))),
+                ]),
+              ),
+              Container(
+                padding: const EdgeInsets.fromLTRB(16, 8, 14, 10),
+                decoration: BoxDecoration(border: Border(top: BorderSide(color: Look.ink.withValues(alpha: 0.18)))),
+                child: Row(children: [
+                  Expanded(
+                    child: Text(
+                      [
+                        '$minutes min',
+                        if (topArtist.isNotEmpty) 'top: $topArtist',
+                        if (streak >= 2) '$streak days in a row',
+                      ].join('  ·  '),
+                      maxLines: 2,
+                      style: Look.ui(11.5, weight: FontWeight.w700, color: Look.ink.withValues(alpha: 0.8), height: 1.3),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text('mixtape', style: Look.hand(18, color: stripes[0])),
+                ]),
+              ),
+            ]),
           ),
         ]),
       ),

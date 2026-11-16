@@ -161,7 +161,7 @@ void main() {
     await close(tester);
   });
 
-  testWidgets('Stats, and Wrapped card by card', (tester) async {
+  testWidgets('Stats, and Rewind card by card', (tester) async {
     await pumpApp(tester);
     Shell.push(const StatsPage());
     await wait(tester);
@@ -173,16 +173,19 @@ void main() {
     await wait(tester);
     await shot(tester, 'stats_further');
 
-    unawaited(WrappedPage.open(inside(tester), 'year'));
+    unawaited(RewindPage.open(inside(tester), 'year'));
     await wait(tester);
     expect(find.text('on Mixtape'), findsOneWidget);
-    await shot(tester, 'wrapped_1');
-    for (var card = 2; card <= 6; card++) {
+    await shot(tester, 'rewind_1');
+    // card after card, up to the J-card at the end, which stays
+    for (var card = 2; card <= 12 && find.text('Share the card').evaluate().isEmpty; card++) {
       await tester.tapAt(const Offset(330, 520));
       await tester.pump(const Duration(milliseconds: 500));
       await wait(tester, rounds: 2);
-      await shot(tester, 'wrapped_$card');
+      await shot(tester, 'rewind_$card');
     }
+    expect(find.text('Share the card'), findsOneWidget, reason: 'Rewind ends on the J-card');
+    expect(find.byType(JCard), findsOneWidget);
     await close(tester);
   });
 
@@ -190,9 +193,15 @@ void main() {
     await pumpApp(tester);
     Shell.push(const SettingsPage());
     await wait(tester);
+    expect(find.text('Radio'), findsOneWidget);
+    expect(find.text('Crossfade'), findsOneWidget);
+    await shot(tester, 'settings');
+    // further down the list, past what's between songs and the lyrics
+    await tester.scrollUntilVisible(find.textContaining('5 songs'), 300, scrollable: find.byType(Scrollable).first);
+    await wait(tester);
     expect(find.text('Friends can listen along'), findsOneWidget);
     expect(find.textContaining('5 songs'), findsOneWidget, reason: 'the songs saved on the phone are counted');
-    await shot(tester, 'settings');
+    await shot(tester, 'settings_further');
     await close(tester);
   });
 

@@ -245,7 +245,7 @@ void main() {
     await close(tester);
   });
 
-  testWidgets('Stats and Wrapped', (tester) async {
+  testWidgets('Stats and Rewind', (tester) async {
     await start(tester);
     Shell.push(const StatsPage());
     await look(tester, 'stats');
@@ -253,12 +253,12 @@ void main() {
     await look(tester, 'stats_2');
     await scroll(tester, 0.8);
     await look(tester, 'stats_3');
-    unawaited(WrappedPage.open(inside(tester), 'year'));
-    await look(tester, 'wrapped_1');
-    for (var card = 2; card <= 6; card++) {
+    unawaited(RewindPage.open(inside(tester), 'year'));
+    await look(tester, 'rewind_1');
+    for (var card = 2; card <= 12 && find.text('Share the card').evaluate().isEmpty; card++) {
       await tester.tapAt(Offset(phone.size.width * 0.8, phone.size.height * 0.58));
       await tester.pump(const Duration(milliseconds: 500));
-      await look(tester, 'wrapped_$card');
+      await look(tester, 'rewind_$card');
     }
     await close(tester);
   });
