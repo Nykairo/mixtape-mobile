@@ -1,5 +1,6 @@
 package dev.softwarevault.mixtape_native
 
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
 import android.os.Handler
@@ -18,10 +19,14 @@ import java.util.concurrent.Executors
  * The bridge to Mixtape's Dart side on channel "mixtape/native". As a plugin it is there in every
  * Flutter engine, also the one audio_service starts by itself for a media button while the app is closed.
  */
-class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware, PluginRegistry.NewIntentListener {
+class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, ActivityAware, PluginRegistry.NewIntentListener,
+    PluginRegistry.ActivityResultListener {
     private lateinit var channel: MethodChannel
     private lateinit var context: Context
     private var activity: ActivityPluginBinding? = null
+
+    /** The answer waiting for a picture to be picked (a profile picture). */
+    private var picking: MethodChannel.Result? = null
 
     /** The tape a widget opened Mixtape with, until the app asks for it. */
     private var launched: String? = null
@@ -41,6 +46,7 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
     override fun onAttachedToActivity(binding: ActivityPluginBinding) {
         activity = binding
         binding.addOnNewIntentListener(this)
+        binding.addActivityResultListener(this)
         Widgets.tapeOf(binding.activity.intent)?.let { launched = it }
     }
 
@@ -50,7 +56,22 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
 
     override fun onDetachedFromActivity() {
         activity?.removeOnNewIntentListener(this)
+        activity?.removeActivityResultListener(this)
         activity = null
+    }
+
+    /** The picture picked (or none): made into a profile picture away from the main thread. */
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
+        if (requestCode != PICK_PICTURE) return false
+        val answer = picking ?: return true
+        picking = null
+        val uri = data?.data
+        if (resultCode != Activity.RESULT_OK || uri == null) {
+            answer.success(null)
+            return true
+        }
+        offMain(answer) { ProfilePicture.from(context, uri) }
+        return true
     }
 
     /** A widget's tape tapped while Mixtape is open already. */
@@ -94,6 +115,19 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
                     val here = activity?.activity
                     if (here != null) here.startActivity(chooser) else context.startActivity(chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                     result.success(true)
+                }
+            }
+            "pickPicture" -> {
+                val here = activity?.activity
+                if (here == null || picking != null) {
+                    result.success(null)
+                } else {
+                    picking = result
+                    val pick = Intent(Intent.ACTION_GET_CONTENT).apply {
+                        type = "image/*"
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                    }
+                    here.startActivityForResult(Intent.createChooser(pick, null), PICK_PICTURE)
                 }
             }
             "phone" -> result.success(Phone.about(context))
@@ -144,6 +178,7 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
     }
 
     companion object {
+        private const val PICK_PICTURE = 0x6D78 // "mx", a number no other plugin picks for its results
         private val WORK: ExecutorService = Executors.newFixedThreadPool(3)
         private val MAIN = Handler(Looper.getMainLooper())
 

@@ -28,13 +28,44 @@ class Sample {
 }
 
 class Samples extends ChangeNotifier {
-  Samples({required this.seeds, required this.known, required this.unwanted});
+  Samples({required this.seeds, required this.known, required this.unwanted, this.batches});
+
+  /// One artist's Samples, like on the computer's artist pages: their popular songs first, then the
+  /// rest of what they made, then songs from their radio.
+  factory Samples.artist(ArtistPage a, {required bool Function(Track) unwanted}) {
+    final records = [
+      for (final shelf in a.shelves)
+        for (final i in shelf.items)
+          if (i.kind == Kind.album) i.id,
+    ];
+    final seed = a.radioSeed.isNotEmpty ? a.radioSeed : (a.songs.isEmpty ? '' : a.songs.first.ref);
+    return Samples(
+      seeds: () => const [],
+      known: () => const {},
+      unwanted: unwanted,
+      batches: (round) async => switch (round) {
+        0 => a.songs,
+        1 => [
+            for (final page in await Future.wait([
+              for (final id in records.take(8)) Music.list(id).then<ListPage?>((p) => p, onError: (Object _) => null),
+            ]))
+              ...?page?.songs,
+          ],
+        2 => seed.isEmpty ? const <Track>[] : (await Music.next(seed, playlist: a.radio)).songs,
+        _ => const <Track>[],
+      },
+    );
+  }
 
   /// Songs to start from (liked and played lately), songs not to offer (known already), and songs the
   /// person isn't interested in.
   final List<Track> Function() seeds;
   final Set<String> Function() known;
   final bool Function(Track) unwanted;
+
+  /// Where an artist's Samples get their songs from, a batch a round; null for the usual feed.
+  final Future<List<Track>> Function(int round)? batches;
+  int _round = 0;
 
   static const length = 30.0;
 
@@ -60,6 +91,20 @@ class Samples extends ChangeNotifier {
     trouble = null;
     notifyListeners();
     try {
+      final next = batches;
+      if (next != null) {
+        var added = 0;
+        while (added == 0 && _round < 3) {
+          for (final t in await next(_round++)) {
+            if (t.src == 'yt' && t.dur >= 45 && t.dur <= 900 && !unwanted(t) && _seen.add(t.id)) {
+              items.add(Sample(t));
+              added++;
+            }
+          }
+        }
+        if (items.isEmpty) trouble = 'No songs of theirs turned up. Try again in a moment.';
+        return;
+      }
       final from = [
         for (final t in seeds())
           if (t.src == 'yt') t,

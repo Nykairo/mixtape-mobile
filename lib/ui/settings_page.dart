@@ -11,6 +11,7 @@ import '../blend.dart';
 import '../look.dart';
 import '../phone.dart';
 import 'pages.dart';
+import 'profile_page.dart';
 import 'shell.dart';
 import 'sign_in.dart';
 import 'widgets.dart';
@@ -167,7 +168,9 @@ class SettingsPage extends StatelessWidget {
               ListTile(
                 leading: const Icon(Icons.person_rounded, color: Look.muted),
                 title: Text(s.display, style: Look.ui(15.5)),
-                subtitle: Text('@${s.username}', style: Look.ui(13, color: Look.muted)),
+                subtitle: Text('@${s.username}  ·  your profile', style: Look.ui(13, color: Look.muted)),
+                trailing: const Icon(Icons.chevron_right_rounded, color: Look.muted),
+                onTap: () => ProfilePage.open(s.username),
               ),
               ListTile(
                 leading: const Icon(Icons.sync_rounded, color: Look.muted),

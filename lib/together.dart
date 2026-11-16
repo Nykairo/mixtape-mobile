@@ -184,10 +184,20 @@ class Together extends ChangeNotifier {
 
   String get code => '${room?['code'] ?? ''}';
   bool get isHost => room?['role'] == 'host';
+  bool get isDj => room?['role'] == 'dj';
   bool get party => room?['kind'] == 'party';
 
-  /// Everybody steers a room; only the host steers a party.
-  bool get canSteer => room != null && (!party || isHost);
+  /// Everybody steers a room; at a party the host and the DJs the host picked.
+  bool get canSteer => room != null && (!party || isHost || isDj);
+
+  /// A party's two switches, the host's to flip: guests may ask for songs, new people may come in.
+  bool get takesRequests => (room?['settings'] as Map?)?['requests'] != 'off';
+  bool get open => room?['open'] != false;
+
+  /// Reactions sent up at a party (by anybody, this phone too), for the page to float them.
+  final reactions = StreamController<String>.broadcast();
+  static const reactionKinds = ['heart', 'flame', 'sparkle', 'star', 'note'];
+  DateTime _reacted = DateTime(2000);
 
   /// A new room with what plays here in it (from the song playing on), you its host.
   Future<String> openRoom({bool party = false, String name = ''}) async {
@@ -239,6 +249,8 @@ class Together extends ChangeNotifier {
       'name': '${r['name'] ?? ''}',
       'role': '${r['role'] ?? 'guest'}',
       'host': '${r['host'] ?? ''}',
+      'settings': r['settings'] is Map ? Map<String, Object?>.from(r['settings'] as Map) : <String, Object?>{},
+      'open': r['open'] != false,
     };
     state = rooms.clean(r['state']);
     version = toInt(r['version']);
@@ -251,6 +263,10 @@ class Together extends ChangeNotifier {
     ch.onPeople = (people) {
       here = people;
       notifyListeners();
+    };
+    ch.onHeard = (event, payload) {
+      final kind = '${payload['kind'] ?? ''}';
+      if (event == 'react' && reactionKinds.contains(kind)) reactions.add(kind);
     };
     ch.track({'user': s.username, 'name': s.display});
     _roomCh = ch;
@@ -266,7 +282,7 @@ class Together extends ChangeNotifier {
     _roomPoll = Timer.periodic(const Duration(seconds: 5), (_) => _askRoom());
     _follow();
     unawaited(_fetchMembers());
-    if (party && isHost) unawaited(_fetchRequests());
+    if (party && canSteer) unawaited(_fetchRequests());
     notifyListeners();
   }
 
@@ -298,16 +314,21 @@ class Together extends ChangeNotifier {
     final table = '${data['table'] ?? ''}';
     if (table == 'rooms' || rec.containsKey('state')) {
       if (data['type'] == 'DELETE') {
-        notices.add('The room was closed');
+        notices.add(party ? 'The party is over' : 'The room was closed');
         leaveRoom();
         return;
+      }
+      final r = room;
+      if (r != null) {
+        if (rec['settings'] is Map) r['settings'] = Map<String, Object?>.from(rec['settings'] as Map);
+        if (rec['open'] is bool) r['open'] = rec['open'];
       }
       final v = toInt(rec['version']);
       if (v > version) _adopt(rec['state'], v);
     } else if (table == 'room_members' || (rec.containsKey('member') && rec.containsKey('role'))) {
       _fetchMembers();
     } else if (table == 'room_requests' || rec.containsKey('song')) {
-      if (party && isHost) _fetchRequests();
+      if (party && canSteer) _fetchRequests();
     }
   }
 
@@ -421,6 +442,10 @@ class Together extends ChangeNotifier {
   Future<void> ask(Track t) async {
     final s = shareable(t);
     if (s == null) return;
+    if (!takesRequests) {
+      notices.add("The host isn't taking requests right now.");
+      return;
+    }
     await account.rpc('room_ask', {'room': code, 'song': s});
     notices.add('Asked for ${t.title}');
   }
@@ -438,10 +463,69 @@ class Together extends ChangeNotifier {
         r['profile'] = profiles['${r['member']}'] ?? const {};
       }
       members = rows;
+      // what the host made of this phone: a DJ, a guest again, or shown out
+      final uid = account.session?.uid ?? '';
+      final mine = rows.where((r) => '${r['member']}' == uid).toList();
+      final r = room;
+      if (r != null && rows.isNotEmpty && r['role'] != 'host') {
+        if (mine.isEmpty || mine.first['role'] == 'out') {
+          notices.add('The host showed you out of the party. The music plays on here, as your own.');
+          await leaveRoom();
+          return;
+        }
+        final role = '${mine.first['role'] ?? 'guest'}';
+        if (role != r['role']) {
+          r['role'] = role;
+          notices.add(role == 'dj' ? "You're a DJ now: you play the music too." : "You're a guest again.");
+          if (party && role == 'dj') unawaited(_fetchRequests());
+        }
+      }
       notifyListeners();
     } on AccountError {
       // shown again with the next change
     }
+  }
+
+  /// The host makes someone a DJ ('dj'), a guest again ('guest'), or shows them out ('out').
+  Future<void> setRole(String member, String role) async {
+    if (!isHost) return;
+    await account.rpc('room_host', {'room': code, 'change': {'member': member, 'role': role}});
+    notices.add(switch (role) {
+      'dj' => 'They can play the music now',
+      'out' => 'They were shown out',
+      _ => "They're a guest again",
+    });
+    unawaited(_fetchMembers());
+  }
+
+  /// The host's switches: taking requests, and letting new people in.
+  Future<void> setTakeRequests(bool on) async {
+    final r = room;
+    if (r == null || !isHost) return;
+    final settings = {...(r['settings'] as Map? ?? const {}), 'requests': on ? 'on' : 'off'};
+    r['settings'] = settings;
+    notifyListeners();
+    await account.rpc('room_host', {'room': code, 'change': {'settings': settings}});
+    notices.add(on ? 'Guests can ask for songs again.' : 'Requests are off for now.');
+  }
+
+  Future<void> setOpen(bool on) async {
+    final r = room;
+    if (r == null || !isHost) return;
+    r['open'] = on;
+    notifyListeners();
+    await account.rpc('room_host', {'room': code, 'change': {'open': on}});
+    notices.add(on ? 'New people can come in with the code.' : 'The door is closed: nobody new comes in.');
+  }
+
+  /// A reaction for everybody at the party (it floats up here too). A held finger isn't a hundred.
+  void react(String kind) {
+    if (!reactionKinds.contains(kind) || _roomCh == null) return;
+    final t = DateTime.now();
+    if (t.difference(_reacted) < const Duration(milliseconds: 350)) return;
+    _reacted = t;
+    _roomCh?.say('react', {'kind': kind, 'by': me});
+    reactions.add(kind);
   }
 
   Future<void> _fetchRequests() async {
@@ -598,6 +682,7 @@ class Together extends ChangeNotifier {
     _friendPoll?.cancel();
     _roomPoll?.cancel();
     _link?.close();
+    reactions.close();
     super.dispose();
   }
 }

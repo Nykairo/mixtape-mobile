@@ -81,6 +81,18 @@ class MixtapeNative {
     }
   }
 
+  /// A picture picked from the phone, made into a profile picture: its middle square, 256 pixels, a
+  /// JPEG in base64. Null when nothing was picked, or where there's no picker.
+  static Future<String?> pickPicture() async {
+    try {
+      return await _channel.invokeMethod<String>('pickPicture');
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
+
   /// The phone: its maker (one word: 'xiaomi' also for Redmi and POCO, 'transsion' for Tecno, Infinix
   /// and itel), brand and model, the Android version, whether battery saving leaves Mixtape alone
   /// ('batteryFree') and whether memory is short ('lowRam'). Empty where there's no Android side.

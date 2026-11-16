@@ -81,7 +81,7 @@ class Importer {
     return Listing('Imported songs', wanted: wanted);
   }
 
-  static Future<String> _get(Uri url, {bool json = false}) async {
+  static Future<String> _get(Uri url) async {
     final http.Response res;
     try {
       res = await _client.get(url, headers: _browser).timeout(const Duration(seconds: 20));

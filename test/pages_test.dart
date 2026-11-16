@@ -14,6 +14,7 @@ import 'package:mixtape/app.dart';
 import 'package:mixtape/rooms.dart' as rooms;
 import 'package:mixtape/ui/now_playing.dart';
 import 'package:mixtape/ui/pages.dart';
+import 'package:mixtape/ui/profile_page.dart';
 import 'package:mixtape/ui/settings_page.dart';
 import 'package:mixtape/ui/shell.dart';
 import 'package:mixtape/ui/stats_page.dart';
@@ -261,7 +262,14 @@ void main() {
     t.notifyListeners();
     await wait(tester);
     expect(find.text('ASKED FOR'), findsOneWidget);
+    expect(find.text('Take requests'), findsOneWidget);
+    expect(find.text('End the party'), findsOneWidget);
+    t.reactions.add('heart');
+    t.reactions.add('flame');
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(find.byIcon(Icons.local_fire_department_rounded), findsWidgets);
     await shot(tester, 'together_party');
+    await tester.pump(const Duration(seconds: 4)); // the reactions float away
 
     t.room = null;
     t.state = rooms.blank();
@@ -270,6 +278,60 @@ void main() {
     t.here = {};
     t.notifyListeners();
     Box.account.waiting = [];
+    await close(tester);
+  });
+
+  testWidgets("Profiles: somebody's, and yours to change", (tester) async {
+    Box.account.cards = {
+      'anna': {
+      'id': 'u2',
+      'username': 'anna',
+      'display_name': 'Anna',
+      'pronouns': 'she/her',
+      'bio': 'Tapes for long drives.\nAlways one more song.',
+      'color': '#39d0a0',
+      'avatar': '',
+      'anthem': Box.songs[3].toJson(),
+      'showcase': {
+        'name': 'Night drive',
+        'paper': 2,
+        'design': const {},
+        'songs': [for (final t in Box.songs.take(4)) t.toJson()],
+        'count': 12,
+      },
+      'top_artists': ['Kavinsky', 'M83', 'The Midnight'],
+      'share_listening': true,
+      'updated_at': '2026-11-15T10:00:00Z',
+    },
+      'tester': {'id': 'u1', 'username': 'tester', 'display_name': 'Tester', 'updated_at': '2026-11-15T10:00:00Z'},
+    };
+    await pumpApp(tester);
+    ProfilePage.open('anna');
+    await wait(tester);
+    expect(find.text('Anna'), findsWidgets);
+    expect(find.text('@anna  ·  she/her'), findsOneWidget);
+    expect(find.text('MY SONG'), findsOneWidget);
+    expect(find.text('ON SHOW'), findsOneWidget);
+    expect(find.text('Kavinsky'), findsOneWidget);
+    expect(find.text('Listen along with Anna'), findsOneWidget);
+    await shot(tester, 'profile');
+    await tester.pageBack();
+    await wait(tester);
+
+    ProfilePage.open('tester');
+    await wait(tester);
+    expect(find.text('Edit your profile'), findsOneWidget);
+    await tester.tap(find.text('Edit your profile'));
+    await wait(tester);
+    expect(find.text('Your profile'), findsOneWidget);
+    await tester.enterText(find.widgetWithText(TextField, 'Pronouns'), 'they/them');
+    await wait(tester);
+    expect(find.text('@tester  ·  they/them'), findsOneWidget, reason: 'the card shows it as it is typed');
+    await shot(tester, 'profile_edit');
+    await tester.tap(find.text('Save'));
+    await wait(tester);
+    expect(Box.account.saved?['pronouns'], 'they/them');
+    Box.account.cards = {};
     await close(tester);
   });
 

@@ -36,8 +36,15 @@ class SharedFiles : ContentProvider() {
     override fun query(uri: Uri, projection: Array<out String>?, selection: String?, args: Array<out String>?, order: String?): Cursor? {
         val f = fileOf(uri) ?: return null
         val columns = projection ?: arrayOf(OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE)
-        val row = columns.map { if (it == OpenableColumns.SIZE) f.length() else if (it == OpenableColumns.DISPLAY_NAME) f.name else null }
-        return MatrixCursor(columns, 1).apply { addRow(row.toTypedArray()) }
+        val row = arrayOfNulls<Any>(columns.size)
+        columns.forEachIndexed { k, column ->
+            row[k] = when (column) {
+                OpenableColumns.SIZE -> f.length()
+                OpenableColumns.DISPLAY_NAME -> f.name
+                else -> null
+            }
+        }
+        return MatrixCursor(columns, 1).apply { addRow(row) }
     }
 
     override fun insert(uri: Uri, values: ContentValues?): Uri? = null
