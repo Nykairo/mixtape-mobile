@@ -320,7 +320,16 @@ class SearchResultsList extends StatefulWidget {
 }
 
 class _SearchResultsListState extends State<SearchResultsList> {
-  static const _filters = [('', 'All'), ('songs', 'Songs'), ('videos', 'Videos'), ('albums', 'Albums'), ('artists', 'Artists'), ('playlists', 'Playlists')];
+  // Lyrics finds a song from a line of its words: YouTube Music's song search reads the words too
+  static const _filters = [
+    ('', 'All'),
+    ('songs', 'Songs'),
+    ('lyrics', 'Lyrics'),
+    ('videos', 'Videos'),
+    ('albums', 'Albums'),
+    ('artists', 'Artists'),
+    ('playlists', 'Playlists'),
+  ];
 
   late String _filter = widget.startFilter;
   final _results = <String, SearchResults>{};
@@ -339,7 +348,11 @@ class _SearchResultsListState extends State<SearchResultsList> {
     _busy.add(filter);
     setState(() => _trouble = null);
     try {
-      final got = await Music.search(widget.query, filter: filter, more: more ? have!.more : '');
+      var got = await Music.search(widget.query, filter: filter == 'lyrics' ? 'songs' : filter, more: more ? have!.more : '');
+      // no song knows these words: maybe a lyrics video does
+      if (filter == 'lyrics' && !more && got.items.isEmpty) {
+        got = await Music.search('${widget.query} lyrics', filter: 'videos');
+      }
       if (!mounted) return;
       setState(() {
         _results[filter] = have == null || !more ? got : SearchResults(have.top, [...have.items, ...got.items], got.more);
@@ -405,8 +418,18 @@ class _SearchResultsListState extends State<SearchResultsList> {
                     ? Center(child: Text('Nothing found. Try other words.', style: Look.ui(15, color: Look.muted)))
                     : ListView.builder(
                         padding: EdgeInsets.only(bottom: MediaQuery.paddingOf(context).bottom + 16),
-                        itemCount: r.items.length + (r.top != null ? 1 : 0) + (r.more.isNotEmpty ? 1 : 0),
+                        itemCount: r.items.length + (r.top != null ? 1 : 0) + (r.more.isNotEmpty ? 1 : 0) + (_filter == 'lyrics' ? 1 : 0),
                         itemBuilder: (context, k) {
+                          if (_filter == 'lyrics') {
+                            if (k == 0) {
+                              return Padding(
+                                padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+                                child: Text('Songs with “${widget.query}” in their words',
+                                    style: Look.ui(13.5, color: Look.muted)),
+                              );
+                            }
+                            k--;
+                          }
                           if (r.top != null) {
                             if (k == 0) return _Top(r.top!, related: r.items);
                             k--;

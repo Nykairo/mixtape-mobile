@@ -4,8 +4,13 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.LinearGradient
+import android.graphics.Outline
 import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
 import android.graphics.RadialGradient
+import android.graphics.Rect
+import android.graphics.RectF
 import android.graphics.Shader
 import android.graphics.Typeface
 import android.util.SizeF
@@ -85,6 +90,18 @@ class WidgetPicturesTest {
             }
             save(alone(context, widget, sizes.first(), wallpaper = false), File(out, "preview-$name.png"))
         }
+        // a light tape that's paused, and a long name, the way some songs are called
+        WidgetData.savePlaying(context, mapOf(
+            "id" to "x", "title" to "Everything Everywhere All at Once (Extended Mix)", "artist" to "A Band With a Very Long Name",
+            "playing" to false, "art" to cover.path, "liked" to false, "shuffle" to true, "position" to 3_000L, "duration" to 3_725_000L,
+            "index" to 7, "count" to 8, "tape" to "Sunday",
+            "colors" to colors(0xFFE8E3D8, 0xFFF7B9C9, 0xFF25428E, listOf(0xFFFF6A1A, 0xFFFFA323, 0xFFFFD567), "band"),
+        ))
+        save(alone(context, cassette, SizeF(356f, 170f), wallpaper = true), File(out, "widget-cassette-light.png"))
+        save(alone(context, now, SizeF(356f, 170f), wallpaper = true), File(out, "widget-now-long.png"))
+        save(alone(context, coverWidget, SizeF(170f, 170f), wallpaper = true), File(out, "widget-cover-long.png"))
+        save(alone(context, mini, SizeF(250f, 60f), wallpaper = true), File(out, "widget-mini-narrow.png"))
+
         // nothing played yet, and no tapes
         WidgetData.savePlaying(context, mapOf("title" to "", "artist" to "", "playing" to false))
         WidgetData.saveShelf(context, emptyList<Any>())
@@ -132,7 +149,20 @@ class WidgetPicturesTest {
         view.layout(0, 0, w, h)
         val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         view.draw(Canvas(b))
-        return b
+        // what a launcher does on Android 12 and newer and a drawing without one can't: the card's
+        // corners cut along its outline (clipToOutline)
+        if (!view.clipToOutline) return b
+        val outline = Outline()
+        view.outlineProvider?.getOutline(view, outline)
+        val box = Rect()
+        if (!outline.getRect(box)) return b
+        val cut = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val c = Canvas(cut)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG)
+        c.drawRoundRect(RectF(box), outline.radius, outline.radius, p)
+        p.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+        c.drawBitmap(b, 0f, 0f, p)
+        return cut
     }
 
     private fun wallpaper(c: Canvas, w: Float, h: Float) {

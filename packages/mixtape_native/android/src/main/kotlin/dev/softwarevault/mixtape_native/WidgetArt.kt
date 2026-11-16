@@ -78,6 +78,12 @@ internal object WidgetArt {
         return out
     }
 
+    /** Paints with [s] from now on, fully: a paint dims its shader by the alpha of the last color it had. */
+    private fun Paint.shade(s: Shader) {
+        color = Color.BLACK
+        shader = s
+    }
+
     /** A matrix that scales [src] to cover [w]×[h], centered. */
     private fun fill(src: Bitmap, w: Float, h: Float, x: Float = 0f, y: Float = 0f): Matrix {
         val scale = max(w / src.width, h / src.height)
@@ -111,9 +117,10 @@ internal object WidgetArt {
     /**
      * The cover, blurred and darkened, as the background of a card [w]×[h]: shrunk to a few dozen pixels
      * and drawn big again, which blurs it for next to nothing. Without a cover, the deck's warm black
-     * with a little orange glow.
+     * with a little orange glow. Small, for the launcher to stretch; with a [radius] (only needed before
+     * Android 12, where nothing clips a widget's corners) it comes in the card's full size with them cut.
      */
-    fun backdrop(src: Bitmap?, w: Int, h: Int): Bitmap {
+    fun backdrop(src: Bitmap?, w: Int, h: Int, radius: Float = 0f): Bitmap {
         val small = max(16, min(w, h) / 10)
         val bw = max(small, small * w / max(1, h))
         val out = Bitmap.createBitmap(bw * 4, small * 4, Bitmap.Config.ARGB_8888)
@@ -134,6 +141,38 @@ internal object WidgetArt {
             p.shader = RadialGradient(ow * 0.15f, oh * 0.1f, ow * 0.6f, 0x40FF6A1A, 0x00FF6A1A, Shader.TileMode.CLAMP)
             c.drawRect(0f, 0f, ow, oh, p)
         }
+        if (radius <= 0f) return out
+        val full = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val stretched = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        stretched.shader = BitmapShader(out, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply {
+            setLocalMatrix(Matrix().apply { setScale(w / ow, h / oh) })
+        }
+        Canvas(full).drawRoundRect(RectF(0f, 0f, w.toFloat(), h.toFloat()), radius, radius, stretched)
+        out.recycle()
+        return full
+    }
+
+    /**
+     * The Cover widget's picture, [w]×[h]: the cover filling it, darker toward the bottom where the song
+     * is written over it, with round corners when [radius] says so. Without a cover, the deck's warm
+     * black with a note.
+     */
+    fun coverCard(src: Bitmap?, w: Int, h: Int, radius: Float): Bitmap {
+        val out = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
+        val c = Canvas(out)
+        val p = Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG)
+        val box = RectF(0f, 0f, w.toFloat(), h.toFloat())
+        if (src != null) {
+            p.shade(BitmapShader(src, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply { setLocalMatrix(fill(src, box.width(), box.height())) })
+        } else {
+            p.shade(LinearGradient(0f, 0f, box.width(), box.height(), 0xFF3A2E26.toInt(), 0xFF1B1511.toInt(), Shader.TileMode.CLAMP))
+        }
+        c.drawRoundRect(box, radius, radius, p)
+        if (src == null) note(c, w / 2f, h * 0.42f, min(w, h) * 0.4f, 0x4DF6ECD8)
+        // the shade for the words: nothing over the top half, then darker and darker
+        p.shader = LinearGradient(0f, h * 0.42f, 0f, h.toFloat(), intArrayOf(0x00100A08, 0x59100A08, 0xE0100A08.toInt()),
+            floatArrayOf(0f, 0.45f, 1f), Shader.TileMode.CLAMP)
+        c.drawRoundRect(box, radius, radius, p)
         return out
     }
 
@@ -176,8 +215,8 @@ internal object WidgetArt {
         val shellTop = mix(look.shell, Color.WHITE, 0.12f)
         val shellLow = mix(look.shell, Color.BLACK, 0.18f)
         val alpha = look.shellAlpha.coerceIn(150, 255)
-        p.shader = LinearGradient(0f, shell.top, 0f, shell.bottom,
-            (shellTop and 0x00FFFFFF) or (alpha shl 24), (shellLow and 0x00FFFFFF) or (alpha shl 24), Shader.TileMode.CLAMP)
+        p.shade(LinearGradient(0f, shell.top, 0f, shell.bottom,
+            (shellTop and 0x00FFFFFF) or (alpha shl 24), (shellLow and 0x00FFFFFF) or (alpha shl 24), Shader.TileMode.CLAMP))
         c.drawRoundRect(shell, corner, corner, p)
         p.shader = null
         p.style = Paint.Style.STROKE
@@ -189,7 +228,7 @@ internal object WidgetArt {
         // the label, its stripes, the side, and the window with the reels
         val label = RectF(x0 + cw * 0.06f, y0 + ch * 0.075f, x0 + cw * 0.94f, y0 + ch * 0.705f)
         val lh = label.height()
-        p.shader = LinearGradient(0f, label.top, 0f, label.bottom, mix(look.paper, Color.WHITE, 0.08f), mix(look.paper, Color.BLACK, 0.06f), Shader.TileMode.CLAMP)
+        p.shade(LinearGradient(0f, label.top, 0f, label.bottom, mix(look.paper, Color.WHITE, 0.08f), mix(look.paper, Color.BLACK, 0.06f), Shader.TileMode.CLAMP))
         c.drawRoundRect(label, cw * 0.016f, cw * 0.016f, p)
         p.shader = null
         stripes(c, p, look, RectF(label.left, label.top + lh * 0.40f, label.right, label.top + lh * 0.585f))
@@ -214,9 +253,9 @@ internal object WidgetArt {
         val inset = photoSize * 0.07f
         val inner = RectF(px - photoSize / 2f + inset, py - photoSize / 2f + inset, px + photoSize / 2f - inset, py + photoSize / 2f - inset)
         if (photo != null) {
-            p.shader = BitmapShader(photo, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply {
+            p.shade(BitmapShader(photo, Shader.TileMode.CLAMP, Shader.TileMode.CLAMP).apply {
                 setLocalMatrix(fill(photo, inner.width(), inner.height(), inner.left, inner.top))
-            }
+            })
             c.drawRect(inner, p)
             p.shader = null
         } else {
@@ -276,7 +315,7 @@ internal object WidgetArt {
                 }
             }
             "fade" -> {
-                p.shader = LinearGradient(band.left, 0f, band.right, 0f, s[0], s[min(2, s.size - 1)], Shader.TileMode.CLAMP)
+                p.shade(LinearGradient(band.left, 0f, band.right, 0f, s[0], s[min(2, s.size - 1)], Shader.TileMode.CLAMP))
                 c.drawRect(band.left, band.top, band.right, band.top + band.height() * 0.7f, p)
                 p.shader = null
             }
@@ -320,14 +359,14 @@ internal object WidgetArt {
         val cy = window.centerY()
         for ((x, wound) in listOf(window.left + window.width() * 0.2f to 1f - along, window.right - window.width() * 0.2f to along)) {
             val r = smallest + (biggest - smallest) * wound
-            p.shader = RadialGradient(x, cy, r, intArrayOf(mix(look.tape, Color.BLACK, 0.5f), look.tape, mix(look.tape, Color.WHITE, 0.08f), mix(look.tape, Color.BLACK, 0.4f)),
-                floatArrayOf(0f, 0.55f, 0.92f, 1f), Shader.TileMode.CLAMP)
+            p.shade(RadialGradient(x, cy, r, intArrayOf(mix(look.tape, Color.BLACK, 0.5f), look.tape, mix(look.tape, Color.WHITE, 0.08f), mix(look.tape, Color.BLACK, 0.4f)),
+                floatArrayOf(0f, 0.55f, 0.92f, 1f), Shader.TileMode.CLAMP))
             c.drawCircle(x, cy, r, p)
             p.shader = null
             hub(c, p, x, cy, hubR, look.hub)
         }
         // the window's glass
-        p.shader = LinearGradient(window.left, window.top, window.left + window.width() * 0.4f, window.bottom, 0x14FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP)
+        p.shade(LinearGradient(window.left, window.top, window.left + window.width() * 0.4f, window.bottom, 0x14FFFFFF, 0x00FFFFFF, Shader.TileMode.CLAMP))
         c.drawRect(window, p)
         p.shader = null
         c.restore()
@@ -441,7 +480,7 @@ internal object WidgetArt {
         p.maskFilter = BlurMaskFilter(max(1f, cw * 0.03f), BlurMaskFilter.Blur.NORMAL)
         c.drawRoundRect(RectF(shell.left + 1f, shell.top + ch * 0.06f, shell.right - 1f, shell.bottom + ch * 0.03f), corner, corner, p)
         p.maskFilter = null
-        p.shader = LinearGradient(0f, shell.top, 0f, shell.bottom, mix(look.shell, Color.WHITE, 0.12f), mix(look.shell, Color.BLACK, 0.18f), Shader.TileMode.CLAMP)
+        p.shade(LinearGradient(0f, shell.top, 0f, shell.bottom, mix(look.shell, Color.WHITE, 0.12f), mix(look.shell, Color.BLACK, 0.18f), Shader.TileMode.CLAMP))
         c.drawRoundRect(shell, corner, corner, p)
         p.shader = null
         val label = RectF(x0 + cw * 0.06f, y0 + ch * 0.08f, x0 + cw * 0.94f, y0 + ch * 0.7f)
