@@ -22,18 +22,25 @@
         android:textSize="10.5sp"
         android:textStyle="bold" />
 
-    <TextView
+    <!-- the empty shelf: a drawn cassette with the words right under it, together in the middle -->
+    <FrameLayout
         android:id="@+id/mixtape_tapes_empty"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:drawableTop="@drawable/mixtape_widget_empty_tape"
-        android:drawablePadding="10dp"
-        android:gravity="center"
-        android:text="@string/mixtape_widget_tapes_empty"
-        android:textColor="#A99A88"
-        android:textSize="13sp"
-        android:visibility="gone" />
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:drawableTop="@drawable/mixtape_widget_empty_tape"
+            android:drawablePadding="10dp"
+            android:gravity="center"
+            android:text="@string/mixtape_widget_tapes_empty"
+            android:textColor="#A99A88"
+            android:textSize="13sp" />
+    </FrameLayout>
 
     <LinearLayout
         android:id="@+id/mixtape_tapes_row0"

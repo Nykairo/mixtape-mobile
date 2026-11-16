@@ -1,8 +1,9 @@
 /// The words of the song that plays. Synced ones light up line by line and scroll along by themselves
-/// (a tap on a line jumps there); plain ones are just there to read. Translate puts each line in the
-/// phone's language under it.
+/// (a tap on a line jumps there), with a little clock counting down to the next line; plain ones are
+/// just there to read. Translate puts each line in the phone's language under it.
 library;
 
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -87,26 +88,23 @@ class _LyricsViewState extends State<LyricsView> {
   /// Translate (or back to only the original), over the words.
   Widget _switch(Lyrics l) {
     final on = _mine != null;
-    return Align(
-      alignment: Alignment.centerRight,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-        child: Material(
-          color: on ? Look.cream : Look.cream.withValues(alpha: 0.12),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+      child: Material(
+        color: on ? Look.cream : Look.cream.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
           borderRadius: BorderRadius.circular(20),
-          child: InkWell(
-            borderRadius: BorderRadius.circular(20),
-            onTap: _translating ? null : () => on ? setState(() => _mine = null) : _translate(l),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-              child: Row(mainAxisSize: MainAxisSize.min, children: [
-                _translating
-                    ? SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: Look.cream))
-                    : Icon(Icons.translate_rounded, size: 16, color: on ? Look.bg : Look.cream),
-                const SizedBox(width: 6),
-                Text(on ? 'Original only' : 'Translate', style: Look.ui(13, weight: FontWeight.w700, color: on ? Look.bg : Look.cream)),
-              ]),
-            ),
+          onTap: _translating ? null : () => on ? setState(() => _mine = null) : _translate(l),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            child: Row(mainAxisSize: MainAxisSize.min, children: [
+              _translating
+                  ? SizedBox(width: 15, height: 15, child: CircularProgressIndicator(strokeWidth: 2, color: Look.cream))
+                  : Icon(Icons.translate_rounded, size: 16, color: on ? Look.bg : Look.cream),
+              const SizedBox(width: 6),
+              Text(on ? 'Original only' : 'Translate', style: Look.ui(13, weight: FontWeight.w700, color: on ? Look.bg : Look.cream)),
+            ]),
           ),
         ),
       ),
@@ -143,7 +141,7 @@ class _LyricsViewState extends State<LyricsView> {
         }
         if (!l.synced) {
           return Column(children: [
-            _switch(l),
+            Align(alignment: Alignment.centerRight, child: _switch(l)),
             Expanded(
               child: ListView(controller: _scroll, padding: const EdgeInsets.fromLTRB(24, 12, 24, 40), children: [
                 if (_mine == null)
@@ -205,10 +203,102 @@ class _LyricsViewState extends State<LyricsView> {
                 );
               },
             );
-            return Column(children: [_switch(l), Expanded(child: list)]);
+            return Column(children: [
+              Row(children: [
+                if (App.settings.lyricsCountdown)
+                  Padding(padding: const EdgeInsets.fromLTRB(22, 6, 0, 0), child: _Countdown(lyrics: l)),
+                const Spacer(),
+                _switch(l),
+              ]),
+              Expanded(child: list),
+            ]);
           },
         );
       },
+    );
+  }
+}
+
+/// The little clock by the words: how long until the next line comes, in tenths of a second, in a
+/// ring that closes as it arrives. It works the time out between the player's own reports (five a
+/// second) and draws only when the tenth it shows changes.
+class _Countdown extends StatefulWidget {
+  const _Countdown({required this.lyrics});
+
+  final Lyrics lyrics;
+
+  @override
+  State<_Countdown> createState() => _CountdownState();
+}
+
+class _CountdownState extends State<_Countdown> {
+  StreamSubscription<Duration>? _reports;
+  Timer? _tick;
+  Duration _at = Duration.zero;
+  final _since = Stopwatch();
+  int _tenths = -1;
+  double _closed = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _reports = App.audio.position.listen((p) {
+      _at = p;
+      _since
+        ..reset()
+        ..start();
+    });
+    _tick = Timer.periodic(const Duration(milliseconds: 100), (_) => _count());
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    _reports?.cancel();
+    super.dispose();
+  }
+
+  void _count() {
+    final player = App.audio.player;
+    final ms = _at.inMilliseconds + (player.playing ? (_since.elapsedMilliseconds * player.speed).round() : 0) + 250;
+    final l = widget.lyrics;
+    final line = l.lineAt(ms);
+    if (line + 1 >= l.times.length) {
+      if (_tenths != -1) setState(() => _tenths = -1);
+      return;
+    }
+    final from = line >= 0 ? l.times[line] : 0;
+    final to = l.times[line + 1];
+    final left = max(0, to - ms);
+    final tenths = (left / 100).ceil();
+    if (tenths == _tenths) return;
+    setState(() {
+      _tenths = tenths;
+      _closed = to > from ? (1 - left / (to - from)).clamp(0.0, 1.0) : 1.0;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_tenths < 0) return const SizedBox(height: 34);
+    return SizedBox(
+      height: 34,
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        SizedBox(
+          width: 18,
+          height: 18,
+          child: CircularProgressIndicator(
+            value: _closed,
+            strokeWidth: 2.6,
+            color: Look.accent,
+            backgroundColor: Look.cream.withValues(alpha: 0.14),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text((_tenths / 10).toStringAsFixed(1),
+            style: Look.ui(13.5, weight: FontWeight.w700, color: Look.cream.withValues(alpha: 0.8))
+                .copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
+      ]),
     );
   }
 }

@@ -55,6 +55,12 @@ Future<void> main() async {
     ),
   );
   audio.autoplay = settings.autoplay;
+  audio.setCrossfade(settings.crossfade, shape: settings.fadeShape, albums: settings.albumsWhole);
+  // what changes in the settings reaches the player at once
+  settings.addListener(() {
+    audio.autoplay = settings.autoplay;
+    audio.setCrossfade(settings.crossfade, shape: settings.fadeShape, albums: settings.albumsWhole);
+  });
   audio.onPlayed = library.played;
   audio.onHeard = history.heard;
   audio.unwanted = library.isHidden;

@@ -284,7 +284,8 @@ class _BigCover extends StatelessWidget {
   }
 }
 
-/// The chips under the song: save it, put it on a tape, share it, the sleep timer and the speed.
+/// The chips under the song: save it, put it on a tape, share it, the sleep timer, the speed, the radio
+/// and the crossfade.
 class _Chips extends StatelessWidget {
   const _Chips({required this.track});
 
@@ -332,6 +333,28 @@ class _Chips extends StatelessWidget {
             return Pill(Icons.speed_rounded, '${_speed(speed)}×', () => _speedSheet(context, speed), on: speed != 1.0);
           },
         ),
+        const SizedBox(width: 8),
+        ListenableBuilder(
+          listenable: App.settings,
+          builder: (context, _) {
+            final set = App.settings;
+            return Row(mainAxisSize: MainAxisSize.min, children: [
+              Pill(Icons.radio_rounded, 'Radio', () {
+                set.setAutoplay(!set.autoplay);
+                say(context, set.autoplay ? 'Radio is on. When the queue ends, songs like the last ones keep coming.' : 'Radio is off.');
+              }, on: set.autoplay),
+              const SizedBox(width: 8),
+              Pill(Icons.compare_arrows_rounded, set.crossfade > 0 ? 'Crossfade ${_speed(set.crossfade)} s' : 'Crossfade', () {
+                final on = set.crossfade == 0;
+                set.setCrossfade(seconds: on ? set.crossfadeWas : 0);
+                say(context, on
+                    ? 'Crossfade is on: songs blend for ${_speed(set.crossfade)} seconds. Settings has the length and the shape.'
+                    : 'Crossfade is off.');
+              }, on: set.crossfade > 0),
+            ]);
+          },
+        ),
+        const SizedBox(width: 16),
       ]),
     );
   }
@@ -693,13 +716,25 @@ class _UpNext extends StatelessWidget {
           builder: (context, item, playing) => CustomScrollView(controller: scroll, slivers: [
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-                child: Text(
-                  after <= 0
-                      ? (audio.autoplay ? 'Next: songs like this one' : 'That was the last one')
-                      : '${audio.from.isEmpty ? 'Next up' : 'Playing from ${audio.from}'}  ·  $after more',
-                  style: Look.ui(13.5, color: Look.cream.withValues(alpha: 0.7)),
-                ),
+                padding: const EdgeInsets.fromLTRB(16, 4, 6, 0),
+                child: Row(children: [
+                  Expanded(
+                    child: Text(
+                      after <= 0
+                          ? (audio.autoplay ? 'Next: songs like this one' : 'That was the last one')
+                          : '${audio.from.isEmpty ? 'Next up' : 'Playing from ${audio.from}'}  ·  $after more',
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: Look.ui(13.5, color: Look.cream.withValues(alpha: 0.7)),
+                    ),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => _saveQueue(context),
+                    icon: const Icon(Icons.library_add_outlined, size: 18),
+                    label: const Text('Save as tape'),
+                    style: TextButton.styleFrom(foregroundColor: Look.cream, textStyle: Look.ui(13.5, weight: FontWeight.w700)),
+                  ),
+                ]),
               ),
             ),
             if (view.current != null)
@@ -744,6 +779,18 @@ class _UpNext extends StatelessWidget {
       },
     );
   }
+}
+
+/// The whole queue, as it plays, becomes a tape of its own.
+Future<void> _saveQueue(BuildContext context) async {
+  final songs = App.audio.view.songs;
+  if (songs.isEmpty) return;
+  final from = App.audio.from;
+  final name = await askText(context,
+      title: 'Save the queue as a tape', hint: 'Name it', start: from.isEmpty ? '' : from, action: 'Save');
+  if (name == null || !context.mounted) return;
+  final tape = App.library.newTape(name, songs: songs);
+  say(context, '${count(songs.length)} saved as ${tape.shownName}');
 }
 
 /// Songs and artists YouTube Music puts next to this one.
