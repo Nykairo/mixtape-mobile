@@ -74,6 +74,28 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
                 context.startActivity(chooser)
                 result.success(null)
             }
+            "shareImage" -> {
+                // the picture is copied into the shared folder first, so only it can be read from there
+                val from = java.io.File(call.argument<String>("path") ?: "")
+                if (!from.isFile) {
+                    result.success(false)
+                } else {
+                    val folder = SharedFiles.folder(context)
+                    folder.listFiles()?.forEach { if (System.currentTimeMillis() - it.lastModified() > 3_600_000) it.delete() }
+                    val file = java.io.File(folder, from.name)
+                    from.copyTo(file, overwrite = true)
+                    val send = Intent(Intent.ACTION_SEND).apply {
+                        type = "image/png"
+                        putExtra(Intent.EXTRA_STREAM, SharedFiles.uriOf(context, file))
+                        call.argument<String>("text")?.let { putExtra(Intent.EXTRA_TEXT, it) }
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    val chooser = Intent.createChooser(send, null).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    val here = activity?.activity
+                    if (here != null) here.startActivity(chooser) else context.startActivity(chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    result.success(true)
+                }
+            }
             "phone" -> result.success(Phone.about(context))
             "askBatteryFree" -> result.success(Phone.askBatteryFree(context))
             "makerSettings" -> result.success(Phone.openMakerSettings(context))
