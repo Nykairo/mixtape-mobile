@@ -88,7 +88,8 @@ class CassetteWidget : MixtapeWidget() {
 /** Now playing, the way Spotify and YouTube Music show it: the cover big, its colors behind everything. */
 class NowPlayingWidget : MixtapeWidget() {
     override fun views(context: Context, size: SizeF): RemoteViews {
-        val small = size.height < 100f
+        // a low card gets the one-row layout; the name on top only where there's height for it
+        val small = size.height < 140f
         val v = RemoteViews(context.packageName, if (small) R.layout.mixtape_widget_now_small else R.layout.mixtape_widget_now)
         val s = WidgetData.playing(context)
         val d = Widgets.density(context)
@@ -104,6 +105,7 @@ class NowPlayingWidget : MixtapeWidget() {
         Widgets.play(context, v, s, R.id.mixtape_now_play)
         v.setOnClickPendingIntent(R.id.mixtape_now_next, Widgets.key(context, KeyEvent.KEYCODE_MEDIA_NEXT))
         if (!small) {
+            v.setViewVisibility(R.id.mixtape_now_brand, if (size.height >= 160f) View.VISIBLE else View.GONE)
             v.setOnClickPendingIntent(R.id.mixtape_now_prev, Widgets.key(context, KeyEvent.KEYCODE_MEDIA_PREVIOUS))
             v.setImageViewResource(R.id.mixtape_now_like, if (s?.liked == true) R.drawable.mixtape_widget_heart_on else R.drawable.mixtape_widget_heart)
             v.setImageViewResource(R.id.mixtape_now_shuffle, if (s?.shuffle == true) R.drawable.mixtape_widget_shuffle_on else R.drawable.mixtape_widget_shuffle)

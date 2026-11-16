@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Now playing: the cover big on the left, its colors blurred behind everything, the song with a heart
-     beside it, the time ticking with shuffle next to it, and the three keys under all that. The cover
-     gets as big as the card is high while the keys keep their room (NowPlayingWidget sets it). -->
+<!-- Now playing: the cover big on the left, its colors blurred behind everything, the song, the time
+     ticking with the heart and shuffle at the end of its line, and the three keys under all that. The
+     cover gets as big as the card is high while the keys keep their room, and the name on top only
+     shows on a card high enough for it (NowPlayingWidget sets both). -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/mixtape_now_root"
     android:layout_width="match_parent"
@@ -38,43 +39,23 @@
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/mixtape_now_brand"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:fontFamily="sans-serif-condensed"
-                    android:letterSpacing="0.16"
-                    android:singleLine="true"
-                    android:text="@string/mixtape_widget_name_caps"
-                    android:textColor="#FFB27A"
-                    android:textSize="10.5sp"
-                    android:textStyle="bold" />
-
-                <!-- a heart the size of a thumb that takes no more height than the word beside it -->
-                <ImageButton
-                    android:id="@+id/mixtape_now_like"
-                    android:layout_width="38dp"
-                    android:layout_height="38dp"
-                    android:layout_marginTop="-12dp"
-                    android:layout_marginEnd="-9dp"
-                    android:layout_marginBottom="-12dp"
-                    android:background="@drawable/mixtape_widget_touch"
-                    android:contentDescription="@string/mixtape_widget_like"
-                    android:scaleType="center"
-                    android:src="@drawable/mixtape_widget_heart" />
-            </LinearLayout>
+                android:layout_marginBottom="3dp"
+                android:fontFamily="sans-serif-condensed"
+                android:letterSpacing="0.16"
+                android:singleLine="true"
+                android:text="@string/mixtape_widget_name_caps"
+                android:textColor="#FFB27A"
+                android:textSize="10.5sp"
+                android:textStyle="bold" />
 
             <TextView
                 android:id="@+id/mixtape_now_title"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="3dp"
                 android:ellipsize="end"
                 android:fontFamily="sans-serif-medium"
                 android:singleLine="true"
@@ -113,13 +94,26 @@
                     android:textColor="#99F6ECD8"
                     android:textSize="12sp" />
 
+                <!-- thumb-sized keys that take no more height than the time beside them (the icons inside
+                     them still whole: 22dp in 36dp leaves 7dp on every side) -->
+                <ImageButton
+                    android:id="@+id/mixtape_now_like"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginTop="-7dp"
+                    android:layout_marginBottom="-7dp"
+                    android:background="@drawable/mixtape_widget_touch"
+                    android:contentDescription="@string/mixtape_widget_like"
+                    android:scaleType="center"
+                    android:src="@drawable/mixtape_widget_heart" />
+
                 <ImageButton
                     android:id="@+id/mixtape_now_shuffle"
                     android:layout_width="36dp"
                     android:layout_height="36dp"
-                    android:layout_marginTop="-10dp"
-                    android:layout_marginEnd="-8dp"
-                    android:layout_marginBottom="-10dp"
+                    android:layout_marginTop="-7dp"
+                    android:layout_marginEnd="-7dp"
+                    android:layout_marginBottom="-7dp"
                     android:background="@drawable/mixtape_widget_touch"
                     android:contentDescription="@string/mixtape_widget_shuffle"
                     android:scaleType="center"

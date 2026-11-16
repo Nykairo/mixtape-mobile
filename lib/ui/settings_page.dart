@@ -7,6 +7,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../blend.dart';
 import '../look.dart';
 import '../phone.dart';
 import 'pages.dart';
@@ -80,12 +81,31 @@ class SettingsPage extends StatelessWidget {
             SwitchListTile(
               value: App.settings.autoplay,
               activeThumbColor: Look.accent,
-              title: Text('Keep the music going', style: Look.ui(15.5)),
-              subtitle: Text('When a list ends, songs like the last one play on.', style: Look.ui(13, color: Look.muted)),
+              title: Text('Radio', style: Look.ui(15.5)),
+              subtitle: Text('When the queue ends, songs like the last ones keep coming.', style: Look.ui(13, color: Look.muted)),
               onChanged: (on) {
                 App.settings.setAutoplay(on);
                 App.audio.autoplay = on;
               },
+            ),
+            const SectionTitle('Between songs'),
+            const _Crossfade(),
+            const SectionTitle('Lyrics'),
+            SwitchListTile(
+              value: App.settings.lyricsCountdown,
+              activeThumbColor: Look.accent,
+              title: Text('Count down to every line', style: Look.ui(15.5)),
+              subtitle: Text('A little clock next to lyrics that follow the song closes its ring as the next line comes.',
+                  style: Look.ui(13, color: Look.muted, height: 1.35)),
+              onChanged: App.settings.setLyricsCountdown,
+            ),
+            SwitchListTile(
+              value: App.settings.rewindNote,
+              activeThumbColor: Look.accent,
+              title: Text('Tell me when my Rewind is ready', style: Look.ui(15.5)),
+              subtitle: Text("Early in the month, Home says when last month's Rewind is there to play.",
+                  style: Look.ui(13, color: Look.muted, height: 1.35)),
+              onChanged: App.settings.setRewindNote,
             ),
             if (Platform.isAndroid) ...[
               const SectionTitle('With the screen off'),
@@ -193,6 +213,136 @@ class SettingsPage extends StatelessWidget {
 
 /// Music with the screen off: whether Android's battery saving leaves Mixtape alone, and on phones whose
 /// maker adds a battery manager of its own, where to let Mixtape off there too.
+/// Crossfade: on or off, how long the two songs overlap (a drawing of the two volumes shows it), the
+/// shape of the blend, and whether an album's songs run into each other as they were made.
+class _Crossfade extends StatelessWidget {
+  const _Crossfade();
+
+  @override
+  Widget build(BuildContext context) {
+    final set = App.settings;
+    final on = set.crossfade > 0;
+    final secs = on ? set.crossfade : set.crossfadeWas;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      SwitchListTile(
+        value: on,
+        activeThumbColor: Look.accent,
+        title: Text('Crossfade', style: Look.ui(15.5)),
+        subtitle: Text('The song that ends blends into the next one, the way a DJ does. A skip still cuts.',
+            style: Look.ui(13, color: Look.muted, height: 1.35)),
+        onChanged: (v) => set.setCrossfade(seconds: v ? set.crossfadeWas : 0),
+      ),
+      if (on) ...[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 4, 18, 0),
+          child: SizedBox(
+            height: 74,
+            child: CustomPaint(size: Size.infinite, painter: FadePicture(set.fadeShape, secs / longestFade)),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 18, 0),
+          child: Row(children: [
+            Expanded(
+              child: Slider(
+                value: secs,
+                min: 1,
+                max: longestFade,
+                divisions: ((longestFade - 1) * 2).round(),
+                activeColor: Look.accent,
+                label: '${_secs(secs)} s',
+                onChanged: (v) => set.setCrossfade(seconds: v),
+              ),
+            ),
+            SizedBox(
+              width: 52,
+              child: Text('${_secs(secs)} s', textAlign: TextAlign.end, style: Look.ui(15, weight: FontWeight.w700)),
+            ),
+          ]),
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Wrap(spacing: 8, runSpacing: 8, children: [
+            for (final e in fadeShapes.entries)
+              ChoiceChip(
+                label: Text(e.value),
+                selected: set.fadeShape == e.key,
+                showCheckmark: false,
+                labelStyle: Look.ui(13.5, weight: FontWeight.w600, color: set.fadeShape == e.key ? Look.bg : Look.cream),
+                selectedColor: Look.cream,
+                backgroundColor: Look.raised,
+                side: BorderSide.none,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                onSelected: (_) => set.setCrossfade(shape: e.key),
+              ),
+          ]),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(18, 10, 18, 4),
+          child: Text(fadeShapeAbout[set.fadeShape] ?? '', style: Look.ui(13, color: Look.muted, height: 1.35)),
+        ),
+        SwitchListTile(
+          value: set.albumsWhole,
+          activeThumbColor: Look.accent,
+          title: Text('Albums play straight through', style: Look.ui(15.5)),
+          subtitle: Text('Two songs that follow each other on one album run into each other the way they were made.',
+              style: Look.ui(13, color: Look.muted, height: 1.35)),
+          onChanged: (v) => set.setCrossfade(albums: v),
+        ),
+      ],
+    ]);
+  }
+
+  static String _secs(double s) => s == s.roundToDouble() ? s.toStringAsFixed(0) : s.toStringAsFixed(1);
+}
+
+/// The two volumes of a crossfade over time: the song that ends going down, the next one coming up,
+/// the blend as wide as [part] of the longest one.
+class FadePicture extends CustomPainter {
+  const FadePicture(this.shape, this.part);
+
+  final String shape;
+  final double part;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final floor = h - 6;
+    const top = 8.0;
+    final blend = w * (0.18 + 0.64 * part.clamp(0.0, 1.0));
+    final x0 = (w - blend) / 2;
+    final grid = Paint()
+      ..color = Look.edge
+      ..strokeWidth = 1;
+    canvas.drawLine(Offset(0, floor), Offset(w, floor), grid);
+    Path line(bool ending) {
+      final path = Path()..moveTo(0, ending ? top : floor);
+      path.lineTo(x0, ending ? top : floor);
+      for (var k = 0; k <= 48; k++) {
+        final f = k / 48;
+        final (out, into) = blendGains(shape, f);
+        path.lineTo(x0 + blend * f, floor - (floor - top) * (ending ? out : into));
+      }
+      path.lineTo(w, ending ? floor : top);
+      return path;
+    }
+
+    final pen = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.6
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(line(true), pen..color = Look.cream.withValues(alpha: 0.55));
+    canvas.drawPath(line(false), pen..color = Look.accent);
+    final shade = Paint()..color = Look.accent.withValues(alpha: 0.08);
+    canvas.drawRect(Rect.fromLTRB(x0, top - 4, x0 + blend, floor), shade);
+  }
+
+  @override
+  bool shouldRepaint(FadePicture old) => old.shape != shape || old.part != part;
+}
+
 class _Background extends StatelessWidget {
   const _Background();
 

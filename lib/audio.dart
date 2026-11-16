@@ -16,6 +16,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
 
+import 'blend.dart';
 import 'downloads.dart';
 import 'model.dart';
 import 'store.dart';
@@ -359,6 +360,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
     _player.loopModeStream.listen((_) => _broadcast(_player.playbackEvent));
     _player.playingStream.listen((playing) {
       _keepSaving(playing);
+      if (!playing) _endBlend(); // a call or a headset pulled out: the end of the last song goes quiet too
       if (playing) {
         _heardClock.start();
       } else {
@@ -414,6 +416,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   }
 
   Future<void> _setSongs(List<Track> list, int index, Duration at, {bool preload = true}) async {
+    _endBlend();
     _songs
       ..clear()
       ..addAll(list);
@@ -647,12 +650,14 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   @override
   Future<void> pause() async {
     if (steer?.call('pause') ?? false) return;
+    _endBlend();
     await _player.pause();
   }
 
   @override
   Future<void> seek(Duration position) async {
     if (steer?.call('seek', position) ?? false) return;
+    _endBlend();
     await _player.seek(position);
   }
 
@@ -666,6 +671,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   @override
   Future<void> skipToNext() async {
     if (steer?.call('next') ?? false) return;
+    _endBlend();
     if (_player.hasNext) {
       await _player.seekToNext();
     } else {
@@ -679,6 +685,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   @override
   Future<void> skipToPrevious() async {
     if (steer?.call('previous') ?? false) return;
+    _endBlend();
     if (_player.position > const Duration(seconds: 4) || !_player.hasPrevious) {
       await _player.seek(Duration.zero);
     } else {
@@ -689,6 +696,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   @override
   Future<void> skipToQueueItem(int index) async {
     if (index < 0 || index >= _songs.length) return;
+    _endBlend();
     await _player.seek(Duration.zero, index: index);
     _go();
   }
@@ -710,6 +718,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
 
   @override
   Future<void> stop() async {
+    _endBlend();
     _countHeard(null);
     await _saveSession();
     await _player.stop();
@@ -821,6 +830,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   /// The music fades out over a few seconds and pauses.
   Future<void> _fallAsleep() async {
     _asleep();
+    _endBlend();
     for (var k = 10; k >= 0 && _player.playing; k--) {
       await _player.setVolume(k / 10);
       await Future<void>.delayed(const Duration(milliseconds: 700));
@@ -831,6 +841,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
 
   /// The end of the song the sleep timer waits for: paused right there, the next song ready.
   void _nearTheEnd(Duration pos) {
+    _lookAhead(pos);
     if (!sleepAtEnd || !_player.playing) return;
     final total = _player.duration;
     if (total == null || total.inMilliseconds < 1000) return;
@@ -840,6 +851,127 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
         if (_player.hasNext) await _player.seekToNext();
       }).ignore();
     }
+  }
+
+  // ------------------------------------------------------------ one song into the next
+
+  /// How long two songs overlap when one runs into the next (zero: not at all) and the shape of it
+  /// (blend.dart), and whether two songs that follow each other on one album run into each other the
+  /// way they were made, without a blend. A skip always cuts: a phone can't get a song's end back
+  /// quickly enough from the internet to blend it.
+  Duration crossfade = Duration.zero;
+  String fadeShape = 'smooth';
+  bool albumsWhole = true;
+
+  /// The song that ends plays out on this one while the next one comes in on the player. Made the first
+  /// time a blend needs it, gone again when crossfade is switched off.
+  AudioPlayer? _tail;
+  String _tailFor = ''; // the song (and its length) the tail waits at the end of
+  bool _tailReady = false;
+  Timer? _blendAt; // the moment the blend starts
+  Timer? _blend; // the blend itself, a step every 40 ms
+
+  void setCrossfade(double seconds, {String? shape, bool? albums}) {
+    crossfade = Duration(milliseconds: (fadeSecondsOf(seconds) * 1000).round());
+    if (shape != null) fadeShape = fadeShapeOf(shape);
+    if (albums != null) albumsWhole = albums;
+    if (crossfade == Duration.zero) {
+      _endBlend();
+      final tail = _tail;
+      _tail = null;
+      _tailFor = '';
+      _tailReady = false;
+      tail?.dispose().ignore();
+    }
+  }
+
+  /// The song after this one, in the order the queue plays.
+  Track? get _upNext {
+    final v = view;
+    return v.index >= 0 && v.index + 1 < v.songs.length ? v.songs[v.index + 1] : null;
+  }
+
+  /// Near the end of a song that runs into the next: its end waits on the tail, already loaded, and
+  /// the blend is timed to the moment.
+  void _lookAhead(Duration pos) {
+    if (crossfade == Duration.zero || _blend != null || !_player.playing || steer != null || sleepAtEnd) return;
+    final total = _player.duration;
+    final t = current;
+    final next = _upNext;
+    if (total == null || t == null || next == null || _player.loopMode == LoopMode.one) return;
+    if (total < crossfade * 3 || (albumsWhole && t.album.isNotEmpty && t.album == next.album && t.artist == next.artist)) {
+      return; // a short song, or the next one is the album's next: one after the other, as made
+    }
+    final left = total - pos;
+    if (left > crossfade + const Duration(seconds: 8) || left < crossfade - const Duration(milliseconds: 400)) return;
+    final key = '${t.id}:${total.inMilliseconds}';
+    if (_tailFor != key) {
+      _tailFor = key;
+      _blendAt?.cancel();
+      _blendAt = null;
+      unawaited(_readyTail(t, total - crossfade, key));
+      return;
+    }
+    if (_tailReady && _blendAt == null) {
+      final wait = (left - crossfade) * (1 / _player.speed);
+      _blendAt = Timer(wait.isNegative ? Duration.zero : wait, () => _startBlend(key));
+    }
+  }
+
+  Future<void> _readyTail(Track t, Duration from, String key) async {
+    _tailReady = false;
+    final tail = _tail ??= AudioPlayer(
+        useProxyForRequestHeaders: false, handleAudioSessionActivation: false, handleInterruptions: false);
+    try {
+      await tail.setVolume(0);
+      await tail.setSpeed(_player.speed);
+      await tail.setAudioSource(_source(t), initialPosition: from);
+      _tailReady = _tailFor == key;
+    } on Object {
+      _tailReady = false; // no tail this time: the song ends and the next one starts the usual way
+    }
+  }
+
+  Future<void> _startBlend(String key) async {
+    _blendAt = null;
+    final tail = _tail;
+    final total = _player.duration;
+    if (tail == null || !_tailReady || _tailFor != key || !_player.playing || total == null || _blend != null) return;
+    final left = total - _player.position;
+    // a jump in the song meanwhile: the next look ahead times it again
+    if (left > crossfade + const Duration(milliseconds: 700) || left < const Duration(milliseconds: 300)) return;
+    _tailReady = false;
+    final shape = fadeShape;
+    final speed = _player.speed;
+    // the end plays on the tail from here, at the volume the song had; the player goes on to the next
+    // song, silent at first, and the two cross over the rest of the song's time
+    await tail.setVolume(1);
+    unawaited(tail.play().catchError((Object _) {}));
+    await _player.setVolume(0);
+    await _player.seekToNext();
+    final clock = Stopwatch()..start();
+    final length = left.inMilliseconds / speed;
+    _blend = Timer.periodic(const Duration(milliseconds: 40), (_) {
+      final f = clock.elapsedMilliseconds / length;
+      final (out, into) = blendGains(shape, f);
+      tail.setVolume(out).ignore();
+      _player.setVolume(into).ignore();
+      if (f >= 1) _endBlend();
+    });
+  }
+
+  /// The blend is over, or a key cut it short: the tail stops and the player is at full volume.
+  void _endBlend() {
+    _blendAt?.cancel();
+    _blendAt = null;
+    final running = _blend;
+    if (running == null) return;
+    running.cancel();
+    _blend = null;
+    _tailFor = '';
+    _tailReady = false;
+    _player.setVolume(1).ignore();
+    _tail?.stop().ignore();
   }
 
   @visibleForTesting

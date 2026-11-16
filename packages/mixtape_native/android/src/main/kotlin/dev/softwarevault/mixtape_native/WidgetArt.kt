@@ -268,13 +268,15 @@ internal object WidgetArt {
         c.drawRect(px - photoSize * 0.2f, py - photoSize / 2f - photoSize * 0.07f, px + photoSize * 0.2f, py - photoSize / 2f + photoSize * 0.08f, p)
         c.restore()
 
-        // the song, by hand, on the label's lines to the right of the photo
+        // the song, by hand, on the label's lines to the right of the photo (and the title short of the
+        // "A" in the corner)
         val textLeft = px + photoSize / 2f + cw * 0.035f
         val textRight = label.right - cw * 0.035f
+        val titleRight = label.right - lh * 0.13f * 1.6f - cw * 0.02f
         val ink = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = look.ink; typeface = handwriting(context) }
         val title = s?.title?.ifEmpty { null } ?: "Mixtape"
         val artist = s?.artist?.ifEmpty { null } ?: if (s == null) "press play" else ""
-        written(c, ink, title, textLeft, textRight, label.top + lh * 0.24f, lh * 0.2f)
+        written(c, ink, title, textLeft, titleRight, label.top + lh * 0.24f, lh * 0.2f)
         ink.alpha = 190
         written(c, ink, artist, textLeft, textRight, label.top + lh * 0.365f, lh * 0.125f)
 
