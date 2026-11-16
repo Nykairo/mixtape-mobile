@@ -5,6 +5,7 @@ library;
 
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +17,7 @@ import '../look.dart';
 import '../model.dart';
 import '../rooms.dart' as rooms;
 import '../together.dart';
+import 'profile_page.dart';
 import 'shell.dart';
 import 'sign_in.dart';
 import 'widgets.dart';
@@ -41,6 +43,67 @@ class _TogetherPageState extends State<TogetherPage> {
   final _friend = TextEditingController();
   final _code = TextEditingController();
   final _guest = TextEditingController();
+  final _lookup = TextEditingController();
+
+  void _look() {
+    final name = Account.cleanName(_lookup.text);
+    if (name.isEmpty) return;
+    FocusScope.of(context).unfocus();
+    ProfilePage.open(name, over: context);
+  }
+
+  /// A person at the party or in the room: their profile, and for the host what they may do there.
+  Future<void> _person(Together t, Map<String, Object?> m) async {
+    final prof = m['profile'] is Map ? Map<String, Object?>.from(m['profile'] as Map) : <String, Object?>{};
+    final uid = '${m['member']}';
+    final me = uid == App.account.session?.uid;
+    final role = '${m['role'] ?? 'guest'}';
+    final pick = await showModalBottomSheet<String>(
+      context: context,
+      useRootNavigator: true,
+      builder: (sheet) => SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: Avatar(prof, size: 40),
+            title: Text(_nameOf(prof), style: Look.ui(16, weight: FontWeight.w700)),
+            subtitle: Text(switch (role) { 'host' => 'The host', 'dj' => 'A DJ', _ => 'A guest' }, style: Look.ui(13, color: Look.muted)),
+          ),
+          const Divider(height: 1),
+          ListTile(
+            leading: const Icon(Icons.person_rounded),
+            title: Text(me ? 'Your profile' : 'Their profile'),
+            onTap: () => Navigator.of(sheet).pop('profile'),
+          ),
+          if (t.party && t.isHost && !me && role != 'host') ...[
+            ListTile(
+              leading: Icon(role == 'dj' ? Icons.person_outline_rounded : Icons.headphones_rounded),
+              title: Text(role == 'dj' ? 'Make them a guest again' : 'Make them a DJ'),
+              subtitle: Text(role == 'dj' ? 'They ask for songs like everybody' : 'They play the music too',
+                  style: Look.ui(13, color: Look.muted)),
+              onTap: () => Navigator.of(sheet).pop(role == 'dj' ? 'guest' : 'dj'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.logout_rounded),
+              title: const Text('Show them out'),
+              onTap: () => Navigator.of(sheet).pop('out'),
+            ),
+          ],
+          const SizedBox(height: 8),
+        ]),
+      ),
+    );
+    if (pick == null || !mounted) return;
+    if (pick == 'profile') {
+      final name = '${prof['username'] ?? ''}';
+      if (name.isNotEmpty) ProfilePage.open(name, over: context);
+      return;
+    }
+    try {
+      await t.setRole(uid, pick);
+    } on AccountError catch (e) {
+      if (mounted) say(context, e.message);
+    }
+  }
 
   /// The button that's working right now: 'along', 'room', 'party', 'join' or 'invite'.
   String _busy = '';
@@ -58,6 +121,7 @@ class _TogetherPageState extends State<TogetherPage> {
     _friend.dispose();
     _code.dispose();
     _guest.dispose();
+    _lookup.dispose();
     super.dispose();
   }
 
@@ -149,19 +213,23 @@ class _TogetherPageState extends State<TogetherPage> {
           ),
           body: SafeArea(
             top: false,
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
-              children: [
-                if (!App.account.signedIn)
-                  ..._signedOut()
-                else if (t.room != null)
-                  ..._room(t)
-                else ...[
-                  if (t.friend.isNotEmpty) _Along(t),
-                  ..._doors(t),
+            child: Stack(children: [
+              ListView(
+                padding: const EdgeInsets.fromLTRB(16, 4, 16, 28),
+                children: [
+                  if (!App.account.signedIn)
+                    ..._signedOut()
+                  else if (t.room != null)
+                    ..._room(t)
+                  else ...[
+                    if (t.friend.isNotEmpty) _Along(t),
+                    ..._doors(t),
+                  ],
                 ],
-              ],
-            ),
+              ),
+              // a party's reactions float up the right side
+              if (t.room != null && t.party) Positioned.fill(child: _Floaters(t.reactions.stream)),
+            ]),
           ),
         );
       },
@@ -236,6 +304,18 @@ class _TogetherPageState extends State<TogetherPage> {
           child: _Go('Throw a party', wide: true, busy: _busy == 'party', onTap: () => _open(true)),
         ),
         _Door(
+          icon: Icons.person_search_rounded,
+          title: 'Look someone up',
+          words: 'Their picture, their song, the tape they have on show and what they play most.',
+          child: Row(children: [
+            Expanded(
+              child: _Field(controller: _lookup, hint: 'user name', icon: Icons.alternate_email_rounded, onGo: _look),
+            ),
+            const SizedBox(width: 10),
+            _Go('Look', busy: false, onTap: _look),
+          ]),
+        ),
+        _Door(
           icon: Icons.vpn_key_rounded,
           title: 'Got a code?',
           words: 'Six letters and digits from whoever opened the room.',
@@ -276,6 +356,10 @@ class _TogetherPageState extends State<TogetherPage> {
           padding: const EdgeInsets.fromLTRB(4, 10, 4, 0),
           child: Text(last, textAlign: TextAlign.center, style: Look.ui(13, color: Look.muted)),
         ),
+      if (t.party) ...[
+        const SizedBox(height: 14),
+        _Reactions(onSend: t.react),
+      ],
       const _Heading('Here'),
       Wrap(spacing: 8, runSpacing: 8, children: [
         if (t.members.isEmpty)
@@ -285,9 +369,34 @@ class _TogetherPageState extends State<TogetherPage> {
             _Person(
               name: _nameOf(m['profile']),
               host: m['role'] == 'host',
+              dj: m['role'] == 'dj',
               here: present.contains('${(m['profile'] as Map?)?['username'] ?? ''}'),
+              onTap: () => _person(t, m),
             ),
       ]),
+      if (t.party && t.isHost) ...[
+        const SizedBox(height: 8),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          value: t.takesRequests,
+          activeThumbColor: Look.accent,
+          title: Text('Take requests', style: Look.ui(15.5)),
+          subtitle: Text('Guests can ask for songs.', style: Look.ui(13, color: Look.muted)),
+          onChanged: (v) => t.setTakeRequests(v).catchError((Object e) {
+            if (mounted && e is AccountError) say(context, e.message);
+          }),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          value: t.open,
+          activeThumbColor: Look.accent,
+          title: Text('Let new people in', style: Look.ui(15.5)),
+          subtitle: Text('Off: nobody new comes in with the code.', style: Look.ui(13, color: Look.muted)),
+          onChanged: (v) => t.setOpen(v).catchError((Object e) {
+            if (mounted && e is AccountError) say(context, e.message);
+          }),
+        ),
+      ],
       const SizedBox(height: 14),
       Row(children: [
         Expanded(
@@ -297,7 +406,7 @@ class _TogetherPageState extends State<TogetherPage> {
         const SizedBox(width: 10),
         _Go('Invite', busy: _busy == 'invite', onTap: _invite),
       ]),
-      if (t.party && t.isHost && t.requests.isNotEmpty) ...[
+      if (t.party && t.canSteer && t.requests.isNotEmpty) ...[
         const _Heading('Asked for'),
         for (final r in t.requests)
           _RequestRow(
@@ -343,7 +452,7 @@ class _TogetherPageState extends State<TogetherPage> {
       OutlinedButton.icon(
         onPressed: t.leaveRoom,
         icon: const Icon(Icons.logout_rounded),
-        label: Text(t.party ? 'Leave the party' : 'Leave the room'),
+        label: Text(t.party ? (t.isHost ? 'End the party' : 'Leave the party') : 'Leave the room'),
       ),
     ];
   }
@@ -598,18 +707,22 @@ class _Ticket extends StatelessWidget {
 /// Somebody in the room: their first letter in a circle, their name, a crown on the host. Members
 /// who aren't there right now are greyed.
 class _Person extends StatelessWidget {
-  const _Person({required this.name, this.host = false, this.here = false});
+  const _Person({required this.name, this.host = false, this.dj = false, this.here = false, this.onTap});
 
   final String name;
   final bool host;
+  final bool dj;
   final bool here;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final shown = name.isEmpty ? 'someone' : name;
     return Opacity(
       opacity: here ? 1 : 0.5,
-      child: Container(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
         padding: const EdgeInsets.fromLTRB(5, 5, 12, 5),
         decoration: BoxDecoration(
           color: Look.raised,
@@ -631,6 +744,116 @@ class _Person extends StatelessWidget {
             const SizedBox(width: 5),
             Icon(Icons.star_rounded, size: 15, color: Look.accent),
           ],
+          if (dj) ...[
+            const SizedBox(width: 5),
+            Icon(Icons.headphones_rounded, size: 15, color: Look.accent),
+          ],
+        ]),
+        ),
+      ),
+    );
+  }
+}
+
+/// What guests send up at a party: five little icons, for everybody there.
+class _Reactions extends StatelessWidget {
+  const _Reactions({required this.onSend});
+
+  final void Function(String kind) onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+      decoration: BoxDecoration(color: Look.raised, borderRadius: BorderRadius.circular(30)),
+      child: Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: [
+        for (final kind in Together.reactionKinds)
+          IconButton(
+            tooltip: kind,
+            onPressed: () => onSend(kind),
+            icon: Icon(reactionIcon(kind), color: reactionColor(kind)),
+          ),
+      ]),
+    );
+  }
+}
+
+IconData reactionIcon(String kind) => switch (kind) {
+      'heart' => Icons.favorite_rounded,
+      'flame' => Icons.local_fire_department_rounded,
+      'sparkle' => Icons.auto_awesome_rounded,
+      'star' => Icons.star_rounded,
+      _ => Icons.music_note_rounded,
+    };
+
+Color reactionColor(String kind) => switch (kind) {
+      'heart' => const Color(0xFFFF5F8F),
+      'flame' => const Color(0xFFFF6A1A),
+      'sparkle' => const Color(0xFFFFD567),
+      'star' => const Color(0xFFE7B24A),
+      _ => const Color(0xFF4DA3FF),
+    };
+
+/// Reactions floating up and fading out along the right side, a couple of seconds each. Nothing
+/// runs while none are in the air.
+class _Floaters extends StatefulWidget {
+  const _Floaters(this.reactions);
+
+  final Stream<String> reactions;
+
+  @override
+  State<_Floaters> createState() => _FloatersState();
+}
+
+class _FloatersState extends State<_Floaters> with TickerProviderStateMixin {
+  final _flying = <(String, double, AnimationController)>[];
+  StreamSubscription<String>? _heard;
+  final _random = Random();
+
+  @override
+  void initState() {
+    super.initState();
+    _heard = widget.reactions.listen(_launch);
+  }
+
+  void _launch(String kind) {
+    if (!mounted || _flying.length >= 24) return;
+    final c = AnimationController(vsync: this, duration: Duration(milliseconds: 2200 + _random.nextInt(800)));
+    final entry = (kind, _random.nextDouble(), c);
+    setState(() => _flying.add(entry));
+    c.forward().whenComplete(() {
+      c.dispose();
+      if (mounted) setState(() => _flying.remove(entry));
+    });
+  }
+
+  @override
+  void dispose() {
+    _heard?.cancel();
+    for (final (_, _, c) in _flying) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return IgnorePointer(
+      child: LayoutBuilder(
+        builder: (context, box) => Stack(children: [
+          for (final (kind, lane, c) in _flying)
+            AnimatedBuilder(
+              animation: c,
+              builder: (context, child) {
+                final t = c.value;
+                return Positioned(
+                  right: 18 + lane * 60 + sin(t * pi * 3 + lane * 6) * 10,
+                  bottom: 40 + t * box.maxHeight * 0.55,
+                  child: Opacity(opacity: (1 - t).clamp(0.0, 1.0), child: Transform.scale(scale: 0.8 + t * 0.5, child: child)),
+                );
+              },
+              child: Icon(reactionIcon(kind), color: reactionColor(kind), size: 30),
+            ),
         ]),
       ),
     );

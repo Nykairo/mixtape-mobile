@@ -19,6 +19,7 @@ import 'package:mixtape/app.dart';
 import 'package:mixtape/rooms.dart' as rooms;
 import 'package:mixtape/ui/now_playing.dart';
 import 'package:mixtape/ui/pages.dart';
+import 'package:mixtape/ui/profile_page.dart';
 import 'package:mixtape/ui/settings_page.dart';
 import 'package:mixtape/ui/shell.dart';
 import 'package:mixtape/ui/sign_in.dart';
@@ -326,6 +327,8 @@ void main() {
     ];
     t.notifyListeners();
     await look(tester, 'together_party');
+    await scroll(tester, 0.6);
+    await look(tester, 'together_party_2');
 
     t.room = null;
     t.state = rooms.blank();
@@ -334,6 +337,45 @@ void main() {
     t.here = {};
     t.notifyListeners();
     Box.account.waiting = [];
+    await close(tester);
+  });
+
+  testWidgets('Profiles', (tester) async {
+    Box.account.cards = {
+      'anna': {
+      'id': 'u2',
+      'username': 'anna',
+      'display_name': 'Anna',
+      'pronouns': 'she/her',
+      'bio': 'Tapes for long drives.\nAlways one more song.',
+      'color': '#39d0a0',
+      'avatar': '',
+      'anthem': Box.songs[3].toJson(),
+      'showcase': {
+        'name': 'Night drive',
+        'paper': 2,
+        'design': const {},
+        'songs': [for (final t in Box.songs.take(4)) t.toJson()],
+        'count': 12,
+      },
+      'top_artists': ['Kavinsky', 'M83', 'The Midnight'],
+      'share_listening': true,
+      'updated_at': '2026-11-15T10:00:00Z',
+    },
+      'tester': {'id': 'u1', 'username': 'tester', 'display_name': 'Tester', 'updated_at': '2026-11-15T10:00:00Z'},
+    };
+    await start(tester);
+    ProfilePage.open('anna');
+    await look(tester, 'profile');
+    await tester.pageBack();
+    await tester.pumpAndSettle();
+    ProfilePage.open('tester');
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Edit your profile'));
+    await look(tester, 'profile_edit');
+    await scroll(tester, 0.7);
+    await look(tester, 'profile_edit_2');
+    Box.account.cards = {};
     await close(tester);
   });
 

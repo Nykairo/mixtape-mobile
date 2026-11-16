@@ -382,6 +382,68 @@ class Account {
     return rows.first;
   }
 
+  /// Everything somebody shows on their profile, picture included (yours too). AccountError with
+  /// 'nobody' when there's no such account.
+  Future<Map<String, Object?>> card(String username) async {
+    final rows = await _get('/rest/v1/profiles?username=eq.${Uri.encodeComponent(cleanName(username))}'
+        '&select=id,username,display_name,pronouns,bio,color,avatar,anthem,showcase,top_artists,share_listening,updated_at');
+    if (rows.isEmpty) throw AccountError('room', 'nobody');
+    return rows.first;
+  }
+
+  /// Changes what your profile shows: only the fields given, each checked the way the computer checks
+  /// it (account.save_profile there), so a mistake says what's wrong instead of failing quietly.
+  Future<void> saveProfile(Map<String, Object?> fields) async {
+    final s = session;
+    if (s == null) throw AccountError('signin');
+    String line(Object? v, int limit) {
+      final t = '${v ?? ''}'.split(RegExp(r'\s+')).where((w) => w.isNotEmpty).join(' ');
+      return t.length > limit ? t.substring(0, limit) : t;
+    }
+
+    final out = <String, Object?>{};
+    if (fields.containsKey('display_name')) out['display_name'] = line(fields['display_name'], 40);
+    if (fields.containsKey('pronouns')) out['pronouns'] = line(fields['pronouns'], 24);
+    if (fields.containsKey('bio')) {
+      final lines = <String>[];
+      for (final l in '${fields['bio'] ?? ''}'.trim().split('\n')) {
+        final one = line(l, 160);
+        if (one.isNotEmpty || (lines.isNotEmpty && lines.last.isNotEmpty)) lines.add(one);
+      }
+      final bio = lines.take(4).join('\n');
+      out['bio'] = bio.length > 160 ? bio.substring(0, 160) : bio;
+    }
+    if (fields.containsKey('color')) {
+      final c = '${fields['color'] ?? ''}'.toLowerCase();
+      out['color'] = RegExp(r'^#[0-9a-f]{6}$').hasMatch(c) ? c : '';
+    }
+    if (fields.containsKey('avatar')) {
+      final a = '${fields['avatar'] ?? ''}';
+      if (a.length > 160000 || (a.isNotEmpty && !a.startsWith('/9j/') && !a.startsWith('iVBORw0KGgo'))) {
+        throw AccountError('server', 'picture too big');
+      }
+      out['avatar'] = a;
+    }
+    if (fields.containsKey('anthem')) out['anthem'] = fields['anthem'];
+    if (fields.containsKey('showcase')) out['showcase'] = fields['showcase'] is Map ? fields['showcase'] : null;
+    if (fields.containsKey('top_artists')) {
+      final names = fields['top_artists'];
+      out['top_artists'] = [
+        for (final n in names is List ? names : const [])
+          if ('$n'.isNotEmpty) '$n'.length > 60 ? '$n'.substring(0, 60) : '$n',
+      ].take(5).toList();
+    }
+    if (out.isEmpty) return;
+    final (status, data) = await _call('PATCH', '/rest/v1/profiles?id=eq.${s.uid}',
+        body: out, token: await token(), prefer: 'return=minimal');
+    if (status != 200 && status != 204) throw _error(status, data);
+    final shown = out['display_name'];
+    if (shown is String && shown.isNotEmpty) {
+      s.display = shown;
+      await _keep(s);
+    }
+  }
+
   /// Profiles by account id (without pictures: they're the big part).
   Future<Map<String, Map<String, Object?>>> people(Iterable<String> ids) async {
     final want = {

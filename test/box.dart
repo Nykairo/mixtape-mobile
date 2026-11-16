@@ -97,6 +97,24 @@ class FakeAccount extends Account {
   @override
   Future<Map<String, List<int>>> pullPictures(Iterable<String> names) async => {};
 
+  /// Profiles by user name, and what was saved to this account's own.
+  Map<String, Map<String, Object?>> cards = {};
+  Map<String, Object?>? saved;
+
+  @override
+  Future<Map<String, Object?>> card(String username) async {
+    final c = cards[Account.cleanName(username)];
+    if (c == null) throw AccountError('room', 'nobody');
+    return Map.of(c);
+  }
+
+  @override
+  Future<void> saveProfile(Map<String, Object?> fields) async {
+    saved = Map.of(fields);
+    final me = cards[session?.username ?? ''];
+    if (me != null) me.addAll(fields);
+  }
+
   @override
   Future<void> publish(Map<String, Object?> state) async {}
 

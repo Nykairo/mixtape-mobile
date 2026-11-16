@@ -1,5 +1,5 @@
 /// Podcasts, the way the computer adds them (library.podcast there): found by name in Apple's podcast
-/// directory, or from a pasted RSS link, and kept as a tape called "Podcast: <name>" with its newest
+/// directory, or from a pasted RSS link, and kept as a tape called "Podcast: name" with its newest
 /// episodes, so the computer and the phone share them through the account.
 library;
 
@@ -85,13 +85,13 @@ class Podcasts {
     return utf8.decode(res.bodyBytes, allowMalformed: true);
   }
 
-  /// What's inside the first <tag>...</tag> (empty when there's none).
+  /// What's inside the first `<tag>...</tag>` (empty when there's none).
   static String _tag(String xml, String tag) {
     final m = RegExp('<$tag(?:\\s[^>]*)?>(.*?)</$tag>', dotAll: true).firstMatch(xml);
     return m?.group(1) ?? '';
   }
 
-  /// An attribute of the first <tag ...>.
+  /// An attribute of the first `<tag ...>`.
   static String _attr(String xml, String tag, String attr) {
     final m = RegExp('<$tag\\s[^>]*?$attr\\s*=\\s*["\']([^"\']*)["\']', dotAll: true).firstMatch(xml);
     return m?.group(1) ?? '';

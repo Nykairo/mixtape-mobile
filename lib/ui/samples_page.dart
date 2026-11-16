@@ -10,6 +10,7 @@ import 'package:flutter/material.dart';
 
 import '../app.dart';
 import '../look.dart';
+import '../music.dart';
 import '../samples.dart';
 import 'shell.dart';
 import 'widgets.dart';
@@ -114,12 +115,114 @@ class _SamplesPageState extends State<SamplesPage> {
   }
 }
 
+/// One artist's Samples, over the whole screen: their songs one after another, each from its best
+/// half minute. The music that was on waits, and carries on when this closes.
+class ArtistSamplesPage extends StatefulWidget {
+  const ArtistSamplesPage({super.key, required this.artist});
+
+  final ArtistPage artist;
+
+  static Future<void> open(BuildContext context, ArtistPage a) => Navigator.of(context, rootNavigator: true)
+      .push(MaterialPageRoute<void>(fullscreenDialog: true, builder: (_) => ArtistSamplesPage(artist: a)));
+
+  @override
+  State<ArtistSamplesPage> createState() => _ArtistSamplesPageState();
+}
+
+class _ArtistSamplesPageState extends State<ArtistSamplesPage> {
+  late final Samples _feed = Samples.artist(widget.artist, unwanted: App.library.isHidden);
+  final _pages = PageController();
+  bool _wasPlaying = false;
+  bool _left = false; // a song of theirs was played: that one goes on, not the music from before
+
+  @override
+  void initState() {
+    super.initState();
+    _start();
+  }
+
+  Future<void> _start() async {
+    _wasPlaying = App.audio.player.playing;
+    if (_wasPlaying) await App.audio.pause();
+    await _feed.more();
+    if (mounted && _feed.items.isNotEmpty) await _feed.show(0);
+  }
+
+  @override
+  void dispose() {
+    final feed = _feed;
+    feed.stop().whenComplete(feed.dispose).ignore();
+    if (_wasPlaying && !_left) App.audio.play().ignore();
+    _pages.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ListenableBuilder(
+      listenable: _feed,
+      builder: (context, _) => Scaffold(
+        backgroundColor: Colors.black,
+        body: Stack(children: [
+          if (_feed.items.isEmpty)
+            Center(
+              child: _feed.loading
+                  ? const CircularProgressIndicator()
+                  : Padding(
+                      padding: const EdgeInsets.all(32),
+                      child: Text(_feed.trouble ?? 'Nothing here yet.',
+                          textAlign: TextAlign.center, style: Look.ui(16, color: Look.muted, height: 1.4)),
+                    ),
+            )
+          else
+            PageView.builder(
+              controller: _pages,
+              scrollDirection: Axis.vertical,
+              itemCount: _feed.items.length,
+              onPageChanged: _feed.show,
+              itemBuilder: (context, k) => _SampleCard(
+                sample: _feed.items[k],
+                feed: _feed,
+                here: k == _feed.index,
+                leave: () {
+                  _left = true;
+                  Navigator.of(context).pop();
+                },
+              ),
+            ),
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(18, 4, 4, 0),
+              child: Row(children: [
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('SAMPLES', style: Look.cond(12, color: Look.cream.withValues(alpha: 0.7), spacing: 2)),
+                    Text(widget.artist.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(22, weight: FontWeight.w900)),
+                  ]),
+                ),
+                IconButton(
+                  tooltip: 'Close',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded, color: Colors.white),
+                ),
+              ]),
+            ),
+          ),
+        ]),
+      ),
+    );
+  }
+}
+
 class _SampleCard extends StatelessWidget {
-  const _SampleCard({required this.sample, required this.feed, required this.here});
+  const _SampleCard({required this.sample, required this.feed, required this.here, this.leave});
 
   final Sample sample;
   final Samples feed;
   final bool here;
+
+  /// Where "Play it" goes afterwards: the player; by default Home with the song playing.
+  final VoidCallback? leave;
 
   @override
   Widget build(BuildContext context) {
@@ -194,7 +297,12 @@ class _SampleCard extends StatelessWidget {
             _Side(Icons.play_circle_fill_rounded, 'Play it', () async {
               await feed.stop();
               await App.audio.playSongs([t], from: 'Samples');
-              Shell.goTo(0);
+              final away = leave;
+              if (away != null) {
+                away();
+              } else {
+                Shell.goTo(0);
+              }
             }),
             _Side(Icons.ios_share_rounded, 'Share', () => shareSong(context, t)),
             _Side(Icons.do_not_disturb_on_outlined, 'Not for me', () {

@@ -10,6 +10,7 @@ import '../app.dart';
 import '../look.dart';
 import '../model.dart';
 import '../music.dart';
+import 'samples_page.dart';
 import 'search.dart';
 import 'shell.dart';
 import 'tint.dart';
@@ -197,6 +198,7 @@ class _ArtistViewState extends State<ArtistView> {
                   Wrap(spacing: 8, runSpacing: 8, children: [
                     Pill(Icons.shuffle_rounded, 'Shuffle', () => _shuffle(a), on: true),
                     Pill(Icons.radio_rounded, 'Radio', () => _radio(a)),
+                    if (a.songs.isNotEmpty) Pill(Icons.swipe_vertical_rounded, 'Samples', () => ArtistSamplesPage.open(context, a)),
                     if (a.songs.isNotEmpty) Pill(Icons.ios_share_rounded, 'Share', () => shareSong(context, a.songs.first)),
                   ]),
                 ]),
