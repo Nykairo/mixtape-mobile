@@ -53,6 +53,7 @@ android {
     testOptions {
         unitTests {
             isReturnDefaultValues = true
+            isIncludeAndroidResources = true  // the widgets' layouts, for WidgetPicturesTest
             all {
                 it.outputs.upToDateWhen { false }
                 it.testLogging {
@@ -76,4 +77,6 @@ dependencies {
     implementation("com.github.TeamNewPipe:nanojson:e9d656ddb49a412a5a0a5d5ef20ca7ef09549996")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs_nio:2.1.5")
     testImplementation("junit:junit:4.13.2")
+    // the widgets drawn by their own code on a computer, real graphics included (WidgetPicturesTest)
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }

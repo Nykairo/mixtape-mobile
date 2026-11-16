@@ -12,6 +12,7 @@ import 'app.dart';
 import 'audio.dart';
 import 'downloads.dart';
 import 'history.dart';
+import 'home_widgets.dart';
 import 'library.dart';
 import 'look.dart';
 import 'phone.dart';
@@ -71,6 +72,7 @@ Future<void> main() async {
   ));
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   runApp(const MixtapeApp());
+  HomeWidgets.start();
   if (account.signedIn) library.sync();
 }
 

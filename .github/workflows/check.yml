@@ -1,10 +1,11 @@
 # The quick check for work on any branch but main: the analyzer, the tests and the pictures (on a
-# "screens-<branch>" branch), without building or releasing anything. main gets all of it in android.yml.
+# "screens-<branch>" branch), and the home screen widgets drawn by their own Android code (on
+# "widgets-<branch>"), without building or releasing anything. main gets all of it in android.yml.
 name: Check
 
 on:
   push:
-    branches-ignore: [main, screens, 'screens-*', phones, probe]
+    branches-ignore: [main, screens, 'screens-*', 'widgets-*', phones, probe]
   workflow_dispatch:
 
 permissions:
@@ -64,3 +65,49 @@ jobs:
         run: |
           echo "analyze: ${{ steps.analyze.outcome }}, tests: ${{ steps.tests.outcome }}"
           exit 1
+
+  # the widgets, drawn by the Kotlin that draws them on the phone (WidgetPicturesTest, with Robolectric)
+  widgets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          flutter-version: 3.47.9
+          cache: true
+
+      - name: Fill in the generated files
+        run: flutter create --platforms=android --org dev.softwarevault --project-name mixtape .
+
+      - run: flutter pub get
+
+      - name: The widgets, drawn
+        env:
+          WIDGET_PICTURES: ${{ github.workspace }}/widget-pictures
+          WIDGET_FONT: ${{ github.workspace }}/assets/fonts/CoveredByYourGrace.ttf
+        run: |
+          cd android
+          ./gradlew :mixtape_native:testDebugUnitTest --tests '*WidgetPicturesTest*' --console=plain > widgets.log 2>&1 \
+            || { tail -80 widgets.log; exit 1; }
+          grep -E "picture:|PASSED|FAILED|BUILD" widgets.log | head -40
+
+      - name: Onto the widgets branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BRANCH: ${{ github.ref_name }}
+        run: |
+          cd "$GITHUB_WORKSPACE/widget-pictures"
+          rm -f sample-cover.png
+          git init -q && git checkout -q -b "widgets-$BRANCH"
+          git add .
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -qm "The widgets at ${GITHUB_SHA::7}"
+          git push -qf "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" "widgets-$BRANCH"
