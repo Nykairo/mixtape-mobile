@@ -1,6 +1,8 @@
 /// The parts of Mixtape that live on the Android side: YouTube Music through NewPipe's extractor, and
-/// the "Now playing" widget on the home screen.
+/// the widgets on the home screen.
 library;
+
+import 'dart:async';
 
 import 'package:flutter/services.dart';
 
@@ -98,18 +100,63 @@ class MixtapeNative {
     }
   }
 
-  /// Tells the home screen widget what plays. [art] is a picture file on the phone ('' for none).
-  static Future<void> widget({
-    required String title,
-    required String artist,
-    required bool playing,
-    String art = '',
-  }) async {
+  /// Tells the home screen widgets what plays: title, artist, playing, art (a picture file on the phone,
+  /// '' for none), liked, shuffle, position and duration (milliseconds), index and count (where in the
+  /// queue), tape, colors (the tape's, for the cassette) and track (the song itself, for a like tapped
+  /// on a widget while the app is closed).
+  static Future<void> widget(Map<String, Object?> playing) async {
     try {
-      await _channel.invokeMethod<void>(
-          'widget', {'title': title, 'artist': artist, 'playing': playing, 'art': art});
+      await _channel.invokeMethod<void>('widget', playing);
     } on MissingPluginException {
       // (in tests, and anywhere without the Android side)
+    }
+  }
+
+  /// The tapes for the "My tapes" widget, first one first: id, name, songs, colors and liked (the liked
+  /// songs, which aren't a tape of their own).
+  static Future<void> shelf(List<Map<String, Object?>> tapes) async {
+    try {
+      await _channel.invokeMethod<void>('shelf', tapes);
+    } on MissingPluginException {
+      // as above
+    }
+  }
+
+  static final _taps = StreamController<String>.broadcast();
+  static bool _listening = false;
+
+  /// What's tapped on a widget for the app to do: 'like', 'shuffle', or 'tape:<id>' (open that tape and
+  /// play it).
+  static Stream<String> get widgetTaps {
+    if (!_listening) {
+      _listening = true;
+      _channel.setMethodCallHandler((call) async {
+        if (call.method == 'widget' && call.arguments is String) _taps.add(call.arguments as String);
+        return null;
+      });
+    }
+    return _taps.stream;
+  }
+
+  /// The tape a widget opened Mixtape with ('tape:<id>'), once; null when the app was opened otherwise.
+  static Future<String?> widgetLaunch() async {
+    try {
+      return await _channel.invokeMethod<String>('widgetLaunch');
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
+
+  /// Likes tapped on a widget while the app was closed: a JSON list of {track, liked}.
+  static Future<String> widgetWaiting() async {
+    try {
+      return await _channel.invokeMethod<String>('widgetWaiting') ?? '[]';
+    } on MissingPluginException {
+      return '[]';
+    } on PlatformException {
+      return '[]';
     }
   }
 

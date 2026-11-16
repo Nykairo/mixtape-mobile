@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:description="@string/mixtape_widget_mini_about"
+    android:initialLayout="@layout/mixtape_widget_mini"
+    android:minWidth="250dp"
+    android:minHeight="50dp"
+    android:minResizeWidth="180dp"
+    android:minResizeHeight="50dp"
+    android:previewImage="@drawable/mixtape_preview_mini"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="4"
+    android:targetCellHeight="1"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen" />

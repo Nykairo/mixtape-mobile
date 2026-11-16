@@ -15,7 +15,6 @@ import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:just_audio/just_audio.dart';
-import 'package:mixtape_native/mixtape_native.dart';
 
 import 'downloads.dart';
 import 'model.dart';
@@ -360,7 +359,6 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
     _player.loopModeStream.listen((_) => _broadcast(_player.playbackEvent));
     _player.playingStream.listen((playing) {
       _keepSaving(playing);
-      _widget();
       if (playing) {
         _heardClock.start();
       } else {
@@ -518,7 +516,6 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
     final t = current;
     if (t == null) return;
     mediaItem.add(_item(t));
-    _widget();
     if (t.id != _lastStarted) {
       _lastStarted = t.id;
       _retries = 0;
@@ -716,7 +713,6 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
     _countHeard(null);
     await _saveSession();
     await _player.stop();
-    await _widget();
     await super.stop();
   }
 
@@ -844,34 +840,6 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
         if (_player.hasNext) await _player.seekToNext();
       }).ignore();
     }
-  }
-
-  // ------------------------------------------------------------ the home screen widget
-
-  String _widgetArtFor = '';
-
-  Future<void> _widget() async {
-    final t = current;
-    if (t == null) return;
-    var art = '';
-    final cover = t.artAt(300);
-    final file = Store.the.file('widget_cover.jpg');
-    if (cover.isNotEmpty) {
-      if (_widgetArtFor != t.id) {
-        try {
-          final res = await _client.get(Uri.parse(cover)).timeout(const Duration(seconds: 10));
-          if (res.statusCode == 200 && res.bodyBytes.length < 2000000) {
-            await file.writeAsBytes(res.bodyBytes, flush: true);
-            _widgetArtFor = t.id;
-          }
-        } on Object {
-          _widgetArtFor = '';
-        }
-      }
-      if (_widgetArtFor == t.id) art = file.path;
-    }
-    if (current?.id != t.id) return; // another song meanwhile; its own call draws it
-    await MixtapeNative.widget(title: t.title, artist: t.artist, playing: _player.playing, art: art);
   }
 
   @visibleForTesting

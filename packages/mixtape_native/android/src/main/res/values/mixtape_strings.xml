@@ -1,8 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="mixtape_widget_name">Mixtape</string>
-    <string name="mixtape_widget_description">The song that plays, on a little cassette, with its keys</string>
+    <string name="mixtape_widget_cassette">Mixtape: Cassette</string>
+    <string name="mixtape_widget_cassette_about">The song on a little cassette: the cover glued on its label, the keys in its head</string>
+    <string name="mixtape_widget_now">Mixtape: Now playing</string>
+    <string name="mixtape_widget_now_about">The cover big, with like, shuffle and the keys</string>
+    <string name="mixtape_widget_cover_name">Mixtape: Cover</string>
+    <string name="mixtape_widget_cover_about">Just the cover and a play key</string>
+    <string name="mixtape_widget_mini">Mixtape: Mini player</string>
+    <string name="mixtape_widget_mini_about">One slim row: the song, play and next</string>
+    <string name="mixtape_widget_tapes">Mixtape: My tapes</string>
+    <string name="mixtape_widget_tapes_about">Your tapes as little cassettes: one tap plays one</string>
+    <string name="mixtape_widget_tapes_caps">MY TAPES</string>
+    <string name="mixtape_widget_tapes_empty">Your tapes show up here</string>
+    <string name="mixtape_widget_brand">MIXTAPE  ·  NOW PLAYING</string>
+    <string name="mixtape_widget_name_caps">MIXTAPE</string>
+    <string name="mixtape_widget_nothing">Nothing playing</string>
+    <string name="mixtape_widget_press_play">Press play in Mixtape</string>
+    <string name="mixtape_widget_cover">The cover</string>
     <string name="mixtape_widget_prev">The song before</string>
     <string name="mixtape_widget_play">Play or pause</string>
     <string name="mixtape_widget_next">The next song</string>
+    <string name="mixtape_widget_like">Like</string>
+    <string name="mixtape_widget_shuffle">Shuffle</string>
 </resources>

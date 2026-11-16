@@ -13,7 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mixtape/ui/bars.dart';
 
 class _Seen {
-  _Seen(this.what, this.rect, this.box, {this.sideways = false});
+  _Seen(this.what, this.rect, this.box, {this.sideways = false, this.list});
 
   final String what;
   final Rect rect;
@@ -21,6 +21,34 @@ class _Seen {
 
   /// In a list that scrolls sideways, which goes on past the screen's edge by design.
   final bool sideways;
+
+  /// The list it scrolls in (null when it doesn't): a row half under the tabs is just scrolled there.
+  final Element? list;
+}
+
+Element? _listOf(Element e) {
+  Element? found;
+  e.visitAncestorElements((a) {
+    if (a.widget is Scrollable) {
+      found = a;
+      return false;
+    }
+    return true;
+  });
+  return found;
+}
+
+/// [rect] cut to the lists it scrolls in: what's scrolled out of a list can't be seen.
+Rect _visible(Element e, Rect rect) {
+  var out = rect;
+  e.visitAncestorElements((a) {
+    if (a.widget is Scrollable && a.renderObject is RenderBox && (a.renderObject as RenderBox).hasSize) {
+      final box = a.renderObject as RenderBox;
+      out = out.intersect(_global(box, Offset.zero & box.size));
+    }
+    return true;
+  });
+  return out.isEmpty ? Rect.zero : out;
 }
 
 bool _inSideways(Element e) {
@@ -70,9 +98,9 @@ List<_Seen> _words(WidgetTester tester) {
       local = local.isEmpty ? b.toRect() : local.expandToInclude(b.toRect());
     }
     if (local.isEmpty) continue;
-    final rect = _global(box, local);
-    if (!_reaches(tester, rect.center, box)) continue;
-    out.add(_Seen(text.replaceAll('\n', ' '), rect, box, sideways: _inSideways(e)));
+    final rect = _visible(e, _global(box, local));
+    if (rect.isEmpty || !_reaches(tester, rect.center, box)) continue;
+    out.add(_Seen(text.replaceAll('\n', ' '), rect, box, sideways: _inSideways(e), list: _listOf(e)));
   }
   return out;
 }
@@ -92,12 +120,13 @@ List<_Seen> _buttons(WidgetTester tester) {
   for (final e in taps.evaluate()) {
     final box = e.renderObject;
     if (box is! RenderBox || !box.attached || !box.hasSize || box.size.isEmpty) continue;
-    final rect = _global(box, Offset.zero & box.size);
-    if (!_reaches(tester, rect.center, box)) continue;
+    final rect = _visible(e, _global(box, Offset.zero & box.size));
+    if (rect.isEmpty || !_reaches(tester, rect.center, box)) continue;
     final label = find.descendant(of: find.byElementPredicate((x) => x == e), matching: find.byType(RichText)).evaluate();
     final words = label.isEmpty ? '' : (label.first.renderObject as RenderParagraph).text.toPlainText();
     final tip = e.findAncestorWidgetOfExactType<Tooltip>()?.message ?? '';
-    out.add(_Seen(words.isNotEmpty ? words : (tip.isNotEmpty ? tip : e.widget.runtimeType.toString()), rect, box));
+    out.add(_Seen(words.isNotEmpty ? words : (tip.isNotEmpty ? tip : e.widget.runtimeType.toString()), rect, box,
+        list: _listOf(e)));
   }
   return out;
 }
@@ -160,6 +189,8 @@ List<String> layoutProblems(WidgetTester tester) {
     }
     for (var j = i + 1; j < buttons.length; j++) {
       final b = buttons[j];
+      // only buttons of the same list (or both of none) can be out of place against each other
+      if (a.list != b.list) continue;
       final both = a.rect.intersect(b.rect);
       if (both.isEmpty) continue;
       // one inside the other (a key on a card) is how it's meant to be

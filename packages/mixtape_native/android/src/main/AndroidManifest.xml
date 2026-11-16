@@ -3,11 +3,23 @@
     <!-- to ask, once and with the phone's own dialog, that battery saving leaves the music alone -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <application>
-        <!-- The "Now playing" widget for the home screen (and Samsung's widget stacks) -->
+        <!-- The widgets for the home screen (and Samsung's widget stacks): the Cassette, -->
+        <receiver
+            android:name="dev.softwarevault.mixtape_native.CassetteWidget"
+            android:exported="false"
+            android:label="@string/mixtape_widget_cassette">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/mixtape_widget_cassette" />
+        </receiver>
+        <!-- Now playing (the name it had when it was the only one, so widgets put down then keep working), -->
         <receiver
             android:name="dev.softwarevault.mixtape_native.NowPlayingWidget"
             android:exported="false"
-            android:label="@string/mixtape_widget_name">
+            android:label="@string/mixtape_widget_now">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -15,5 +27,45 @@
                 android:name="android.appwidget.provider"
                 android:resource="@xml/mixtape_now_playing" />
         </receiver>
+        <!-- Cover, -->
+        <receiver
+            android:name="dev.softwarevault.mixtape_native.CoverWidget"
+            android:exported="false"
+            android:label="@string/mixtape_widget_cover_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/mixtape_widget_cover" />
+        </receiver>
+        <!-- the Mini player -->
+        <receiver
+            android:name="dev.softwarevault.mixtape_native.MiniWidget"
+            android:exported="false"
+            android:label="@string/mixtape_widget_mini">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/mixtape_widget_mini" />
+        </receiver>
+        <!-- and My tapes -->
+        <receiver
+            android:name="dev.softwarevault.mixtape_native.TapesWidget"
+            android:exported="false"
+            android:label="@string/mixtape_widget_tapes">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/mixtape_widget_tapes" />
+        </receiver>
+        <!-- like and shuffle, tapped on a widget -->
+        <receiver
+            android:name="dev.softwarevault.mixtape_native.WidgetActions"
+            android:exported="false" />
     </application>
 </manifest>

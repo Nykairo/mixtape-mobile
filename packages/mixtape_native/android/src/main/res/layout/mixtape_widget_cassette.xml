@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The cassette widget: one picture of the whole cassette (WidgetArt.cassette) and three see-through keys
+     laid over the head at its bottom, put in place with padding once the picture's size is known. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/mixtape_cassette_root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <ImageView
+        android:id="@+id/mixtape_cassette_art"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:contentDescription="@string/mixtape_widget_cassette"
+        android:scaleType="fitCenter" />
+
+    <LinearLayout
+        android:id="@+id/mixtape_cassette_keys"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="horizontal">
+
+        <ImageView
+            android:id="@+id/mixtape_cassette_prev"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/mixtape_widget_touch"
+            android:contentDescription="@string/mixtape_widget_prev" />
+
+        <ImageView
+            android:id="@+id/mixtape_cassette_play"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/mixtape_widget_touch"
+            android:contentDescription="@string/mixtape_widget_play" />
+
+        <ImageView
+            android:id="@+id/mixtape_cassette_next"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:background="@drawable/mixtape_widget_touch"
+            android:contentDescription="@string/mixtape_widget_next" />
+    </LinearLayout>
+</FrameLayout>
