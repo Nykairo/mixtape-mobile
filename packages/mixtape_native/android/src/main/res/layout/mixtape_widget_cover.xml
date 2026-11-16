@@ -1,5 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Cover: the cover fills the square, the song along its bottom and a round play key in the corner. -->
+<!-- Cover: the cover fills the card (darker toward the bottom, drawn in WidgetArt.coverCard), the song
+     along its bottom with all the width to itself, a round play key in the top corner and the name in
+     the other one when there's room for both. -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/mixtape_cover_root"
     android:layout_width="match_parent"
@@ -12,20 +14,15 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:contentDescription="@string/mixtape_widget_cover"
-        android:scaleType="centerCrop" />
-
-    <ImageView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:importantForAccessibility="no"
-        android:scaleType="fitXY"
-        android:src="@drawable/mixtape_widget_scrim" />
+        android:scaleType="fitXY" />
 
     <TextView
+        android:id="@+id/mixtape_cover_name"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|start"
-        android:layout_margin="10dp"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="23dp"
         android:background="@drawable/mixtape_widget_pill"
         android:fontFamily="sans-serif-condensed"
         android:letterSpacing="0.16"
@@ -38,48 +35,44 @@
         android:textSize="10sp"
         android:textStyle="bold" />
 
+    <ImageButton
+        android:id="@+id/mixtape_cover_play"
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:layout_gravity="top|end"
+        android:layout_margin="10dp"
+        android:background="@drawable/mixtape_widget_key"
+        android:contentDescription="@string/mixtape_widget_play"
+        android:scaleType="center"
+        android:src="@drawable/mixtape_widget_play" />
+
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:padding="12dp">
+        android:orientation="vertical"
+        android:paddingStart="13dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="13dp"
+        android:paddingBottom="12dp">
 
-        <LinearLayout
-            android:layout_width="0dp"
+        <TextView
+            android:id="@+id/mixtape_cover_title"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:orientation="vertical">
+            android:ellipsize="end"
+            android:fontFamily="sans-serif-medium"
+            android:singleLine="true"
+            android:textColor="#FFFFFF"
+            android:textSize="15sp" />
 
-            <TextView
-                android:id="@+id/mixtape_cover_title"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:fontFamily="sans-serif-medium"
-                android:singleLine="true"
-                android:textColor="#FFFFFF"
-                android:textSize="15sp" />
-
-            <TextView
-                android:id="@+id/mixtape_cover_artist"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:singleLine="true"
-                android:textColor="#D9FFFFFF"
-                android:textSize="12sp" />
-        </LinearLayout>
-
-        <ImageButton
-                android:id="@+id/mixtape_cover_play"
-                android:layout_width="44dp"
-                android:layout_height="44dp"
-                android:background="@drawable/mixtape_widget_key"
-                android:contentDescription="@string/mixtape_widget_play"
-                android:scaleType="center"
-                android:src="@drawable/mixtape_widget_play"
-            android:layout_marginStart="8dp" />
+        <TextView
+            android:id="@+id/mixtape_cover_artist"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:singleLine="true"
+            android:textColor="#D9FFFFFF"
+            android:textSize="12sp" />
     </LinearLayout>
 </FrameLayout>

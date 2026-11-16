@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Now playing: the cover big on the left, its colors blurred behind everything, the song with the time
-     ticking, and like, the song before, play, the next one and shuffle. -->
+<!-- Now playing: the cover big on the left, its colors blurred behind everything, the song with a heart
+     beside it, the time ticking with shuffle next to it, and the three keys under all that. The cover
+     gets as big as the card is high while the keys keep their room (NowPlayingWidget sets it). -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/mixtape_now_root"
     android:layout_width="match_parent"
@@ -13,11 +14,12 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:importantForAccessibility="no"
-        android:scaleType="centerCrop" />
+        android:scaleType="fitXY" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:gravity="center_vertical"
         android:orientation="horizontal"
         android:padding="14dp">
 
@@ -25,6 +27,7 @@
             android:id="@+id/mixtape_now_cover"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
+            android:layout_marginEnd="14dp"
             android:adjustViewBounds="true"
             android:contentDescription="@string/mixtape_widget_cover"
             android:scaleType="fitCenter" />
@@ -32,21 +35,40 @@
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="match_parent"
-            android:layout_marginStart="14dp"
             android:layout_weight="1"
             android:orientation="vertical">
 
-            <TextView
-                android:id="@+id/mixtape_now_brand"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-condensed"
-                android:letterSpacing="0.16"
-                android:singleLine="true"
-                android:text="@string/mixtape_widget_brand"
-                android:textColor="#FFB27A"
-                android:textSize="10.5sp"
-                android:textStyle="bold" />
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="sans-serif-condensed"
+                    android:letterSpacing="0.16"
+                    android:singleLine="true"
+                    android:text="@string/mixtape_widget_name_caps"
+                    android:textColor="#FFB27A"
+                    android:textSize="10.5sp"
+                    android:textStyle="bold" />
+
+                <!-- a heart the size of a thumb that takes no more height than the word beside it -->
+                <ImageButton
+                    android:id="@+id/mixtape_now_like"
+                    android:layout_width="38dp"
+                    android:layout_height="38dp"
+                    android:layout_marginTop="-12dp"
+                    android:layout_marginEnd="-9dp"
+                    android:layout_marginBottom="-12dp"
+                    android:background="@drawable/mixtape_widget_touch"
+                    android:contentDescription="@string/mixtape_widget_like"
+                    android:scaleType="center"
+                    android:src="@drawable/mixtape_widget_heart" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/mixtape_now_title"
@@ -71,7 +93,8 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
+                android:layout_marginTop="3dp"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
 
                 <Chronometer
@@ -83,10 +106,24 @@
 
                 <TextView
                     android:id="@+id/mixtape_now_length"
-                    android:layout_width="wrap_content"
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:singleLine="true"
                     android:textColor="#99F6ECD8"
                     android:textSize="12sp" />
+
+                <ImageButton
+                    android:id="@+id/mixtape_now_shuffle"
+                    android:layout_width="36dp"
+                    android:layout_height="36dp"
+                    android:layout_marginTop="-10dp"
+                    android:layout_marginEnd="-8dp"
+                    android:layout_marginBottom="-10dp"
+                    android:background="@drawable/mixtape_widget_touch"
+                    android:contentDescription="@string/mixtape_widget_shuffle"
+                    android:scaleType="center"
+                    android:src="@drawable/mixtape_widget_shuffle" />
             </LinearLayout>
 
             <FrameLayout
@@ -100,56 +137,40 @@
                 android:gravity="center_vertical"
                 android:orientation="horizontal">
 
+                <FrameLayout android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
+
                 <ImageButton
-                android:id="@+id/mixtape_now_like"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="@android:color/transparent"
-                android:contentDescription="@string/mixtape_widget_like"
-                android:scaleType="center"
-                android:src="@drawable/mixtape_widget_heart" />
+                    android:id="@+id/mixtape_now_prev"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:background="@drawable/mixtape_widget_touch"
+                    android:contentDescription="@string/mixtape_widget_prev"
+                    android:scaleType="center"
+                    android:src="@drawable/mixtape_widget_prev" />
 
                 <FrameLayout android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
 
                 <ImageButton
-                android:id="@+id/mixtape_now_prev"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@android:color/transparent"
-                android:contentDescription="@string/mixtape_widget_prev"
-                android:scaleType="center"
-                android:src="@drawable/mixtape_widget_prev" />
-
-                <ImageButton
-                android:id="@+id/mixtape_now_play"
-                android:layout_width="46dp"
-                android:layout_height="46dp"
-                android:background="@drawable/mixtape_widget_key"
-                android:contentDescription="@string/mixtape_widget_play"
-                android:scaleType="center"
-                android:src="@drawable/mixtape_widget_play"
-                android:layout_marginStart="4dp"
-                android:layout_marginEnd="4dp" />
-
-                <ImageButton
-                android:id="@+id/mixtape_now_next"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:background="@android:color/transparent"
-                android:contentDescription="@string/mixtape_widget_next"
-                android:scaleType="center"
-                android:src="@drawable/mixtape_widget_next" />
+                    android:id="@+id/mixtape_now_play"
+                    android:layout_width="48dp"
+                    android:layout_height="48dp"
+                    android:background="@drawable/mixtape_widget_key"
+                    android:contentDescription="@string/mixtape_widget_play"
+                    android:scaleType="center"
+                    android:src="@drawable/mixtape_widget_play" />
 
                 <FrameLayout android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
 
                 <ImageButton
-                android:id="@+id/mixtape_now_shuffle"
-                android:layout_width="36dp"
-                android:layout_height="36dp"
-                android:background="@android:color/transparent"
-                android:contentDescription="@string/mixtape_widget_shuffle"
-                android:scaleType="center"
-                android:src="@drawable/mixtape_widget_shuffle" />
+                    android:id="@+id/mixtape_now_next"
+                    android:layout_width="42dp"
+                    android:layout_height="42dp"
+                    android:background="@drawable/mixtape_widget_touch"
+                    android:contentDescription="@string/mixtape_widget_next"
+                    android:scaleType="center"
+                    android:src="@drawable/mixtape_widget_next" />
+
+                <FrameLayout android:layout_width="0dp" android:layout_height="1dp" android:layout_weight="1" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

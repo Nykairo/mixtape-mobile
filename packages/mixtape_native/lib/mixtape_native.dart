@@ -125,8 +125,8 @@ class MixtapeNative {
   static final _taps = StreamController<String>.broadcast();
   static bool _listening = false;
 
-  /// What's tapped on a widget for the app to do: 'like', 'shuffle', or 'tape:<id>' (open that tape and
-  /// play it).
+  /// What's tapped on a widget for the app to do: `like`, `shuffle`, or `tape:` and a tape's id (open that
+  /// tape and play it).
   static Stream<String> get widgetTaps {
     if (!_listening) {
       _listening = true;
@@ -138,7 +138,7 @@ class MixtapeNative {
     return _taps.stream;
   }
 
-  /// The tape a widget opened Mixtape with ('tape:<id>'), once; null when the app was opened otherwise.
+  /// The tape a widget opened Mixtape with (`tape:` and its id), once; null when the app was opened otherwise.
   static Future<String?> widgetLaunch() async {
     try {
       return await _channel.invokeMethod<String>('widgetLaunch');

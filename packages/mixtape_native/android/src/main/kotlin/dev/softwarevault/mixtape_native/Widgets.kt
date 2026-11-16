@@ -8,9 +8,11 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.res.Configuration
+import android.graphics.Bitmap
 import android.os.Build
 import android.os.Bundle
 import android.os.SystemClock
+import android.text.format.DateUtils
 import android.util.SizeF
 import android.view.KeyEvent
 import android.view.View
@@ -90,10 +92,14 @@ class NowPlayingWidget : MixtapeWidget() {
         val v = RemoteViews(context.packageName, if (small) R.layout.mixtape_widget_now_small else R.layout.mixtape_widget_now)
         val s = WidgetData.playing(context)
         val d = Widgets.density(context)
-        val coverPx = ((size.height - if (small) 20f else 28f) * d).roundToInt().coerceIn(48, 600)
+        // the cover as big as the card is high, as long as the song and its keys keep their room beside it
+        // (150dp, or the song and two keys in the low one); left out where it would only be a stamp
+        val coverDp = if (small) min(size.height - 20f, size.width - 20f - 12f - 170f) else min(size.height - 28f, size.width - 28f - 14f - 150f)
+        val coverPx = (max(coverDp, 48f) * d).roundToInt().coerceIn(48, 600)
         val src = WidgetArt.cover(s?.art ?: "", coverPx)
-        v.setImageViewBitmap(R.id.mixtape_now_cover, WidgetArt.rounded(src, coverPx, coverPx * 0.1f))
-        v.setImageViewBitmap(R.id.mixtape_now_back, WidgetArt.backdrop(src, (size.width * d).roundToInt(), (size.height * d).roundToInt()))
+        Widgets.cover(context, v, R.id.mixtape_now_cover, if (coverDp >= 56f) WidgetArt.rounded(src, coverPx, coverPx * 0.1f) else null, coverDp)
+        v.setImageViewBitmap(R.id.mixtape_now_back,
+            WidgetArt.backdrop(src, (size.width * d).roundToInt(), (size.height * d).roundToInt(), Widgets.corner(d)))
         Widgets.song(context, v, s, R.id.mixtape_now_title, R.id.mixtape_now_artist)
         Widgets.play(context, v, s, R.id.mixtape_now_play)
         v.setOnClickPendingIntent(R.id.mixtape_now_next, Widgets.key(context, KeyEvent.KEYCODE_MEDIA_NEXT))
@@ -116,10 +122,12 @@ class CoverWidget : MixtapeWidget() {
         val v = RemoteViews(context.packageName, R.layout.mixtape_widget_cover)
         val s = WidgetData.playing(context)
         val d = Widgets.density(context)
-        val px = (max(size.width, size.height) * d).roundToInt().coerceIn(96, 900)
-        // round corners in the picture too, for launchers from before Android 12 that don't clip widgets
-        v.setImageViewBitmap(R.id.mixtape_cover_art, WidgetArt.rounded(WidgetArt.cover(s?.art ?: "", px), px, 22f * d))
+        val w = (size.width * d).roundToInt().coerceIn(96, 900)
+        val h = (size.height * d).roundToInt().coerceIn(96, 900)
+        v.setImageViewBitmap(R.id.mixtape_cover_art, WidgetArt.coverCard(WidgetArt.cover(s?.art ?: "", max(w, h)), w, h, Widgets.corner(d)))
         v.setContentDescription(R.id.mixtape_cover_art, Widgets.said(context, s))
+        // the name and the key side by side need about 150dp; on a smaller one the key is enough
+        v.setViewVisibility(R.id.mixtape_cover_name, if (size.width >= 150f) View.VISIBLE else View.GONE)
         Widgets.song(context, v, s, R.id.mixtape_cover_title, R.id.mixtape_cover_artist)
         Widgets.play(context, v, s, R.id.mixtape_cover_play)
         Widgets.open(context)?.let { v.setOnClickPendingIntent(R.id.mixtape_cover_root, it) }
@@ -133,8 +141,11 @@ class MiniWidget : MixtapeWidget() {
         val v = RemoteViews(context.packageName, R.layout.mixtape_widget_mini)
         val s = WidgetData.playing(context)
         val d = Widgets.density(context)
-        val px = ((min(size.height, 120f) - 16f) * d).roundToInt().coerceIn(32, 320)
-        v.setImageViewBitmap(R.id.mixtape_mini_cover, WidgetArt.rounded(WidgetArt.cover(s?.art ?: "", px), px, px * 0.16f))
+        val coverDp = min(size.height, 120f) - 16f
+        val px = (coverDp * d).roundToInt().coerceIn(32, 320)
+        // on a narrow one the song needs the room more than the cover does
+        val picture = if (size.width >= 230f) WidgetArt.rounded(WidgetArt.cover(s?.art ?: "", px), px, px * 0.16f) else null
+        Widgets.cover(context, v, R.id.mixtape_mini_cover, picture, coverDp)
         Widgets.song(context, v, s, R.id.mixtape_mini_title, R.id.mixtape_mini_artist)
         Widgets.play(context, v, s, R.id.mixtape_mini_play)
         v.setOnClickPendingIntent(R.id.mixtape_mini_next, Widgets.key(context, KeyEvent.KEYCODE_MEDIA_NEXT))
@@ -247,6 +258,24 @@ internal object Widgets {
     /** Pixels per dp for the pictures: the phone's own, up to 3 (sharp anywhere, never heavier than needed). */
     fun density(context: Context) = min(context.resources.displayMetrics.density, 3f)
 
+    /**
+     * The corners to cut into a picture that fills a widget's card. Android 12 and newer cut them on the
+     * launcher's side (clipToOutline, in the launcher's own radius); before that nothing does, so the
+     * picture brings the card's 24dp corners itself.
+     */
+    fun corner(d: Float) = if (Build.VERSION.SDK_INT >= 31) 0f else 24f * d
+
+    /** A cover beside the song, [dp] big at most; [picture] null leaves it out and gives the song the room. */
+    fun cover(context: Context, v: RemoteViews, id: Int, picture: Bitmap?, dp: Float) {
+        if (picture == null) {
+            v.setViewVisibility(id, View.GONE)
+            return
+        }
+        v.setViewVisibility(id, View.VISIBLE)
+        v.setImageViewBitmap(id, picture)
+        v.setInt(id, "setMaxWidth", (dp * context.resources.displayMetrics.density).roundToInt())
+    }
+
     fun said(context: Context, s: Playing?): String =
         if (s == null || s.title.isEmpty()) context.getString(R.string.mixtape_widget_nothing) else "${s.title}, ${s.artist}"
 
@@ -270,12 +299,8 @@ internal object Widgets {
         v.setViewVisibility(time, View.VISIBLE)
         val at = if (s.playing) s.position + (System.currentTimeMillis() - s.at) else s.position
         v.setChronometer(time, SystemClock.elapsedRealtime() - at.coerceIn(0, s.duration), null, s.playing)
-        v.setTextViewText(length, "  /  " + clockText(s.duration))
-    }
-
-    private fun clockText(ms: Long): String {
-        val t = ms / 1000
-        return if (t >= 3600) "%d:%02d:%02d".format(t / 3600, t / 60 % 60, t % 60) else "%d:%02d".format(t / 60, t % 60)
+        // written the way the Chronometer writes its own time, so the two match (01:23 / 03:34)
+        v.setTextViewText(length, "  /  " + DateUtils.formatElapsedTime(s.duration / 1000))
     }
 
     /** A media key, as if pressed on a headset: audio_service's receiver takes it from there. */

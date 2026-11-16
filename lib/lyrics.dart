@@ -1,10 +1,13 @@
 /// The words of the song that plays: synced when they can be (each line lights up as it's sung, a tap on
-/// one jumps there), plain otherwise. From lrclib (free and open, the computer's first choice too), then
-/// YouTube Music's own (synced from Musixmatch for many songs), then plain words from either.
+/// one jumps there), plain otherwise. Asked in the computer's order: lrclib (free and open), YouTube
+/// Music's own (synced from Musixmatch for many songs), NetEase and KuGou (synced too, many Asian and
+/// lesser known songs), then Genius and lyrics.ovh for at least the words. A search hit only counts when
+/// its title, artist and length match the song, so a cover's or another song's words never show up.
 library;
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ui' show PlatformDispatcher;
 
 import 'package:http/http.dart' as http;
 
@@ -95,6 +98,131 @@ String cleanTitle(String title) => title
     .replaceAll(RegExp(r'\s+(feat|ft)\.?\s.*$', caseSensitive: false), '')
     .trim();
 
+/// Lowercase letters and digits only, accents dropped: for telling whether two names match.
+String folded(String s) {
+  final b = StringBuffer();
+  for (final ch in s.toLowerCase().split('')) {
+    final c = _plain[ch] ?? ch;
+    b.write(_letter.hasMatch(c) ? c : ' ');
+  }
+  return b.toString().split(' ').where((w) => w.isNotEmpty).join(' ');
+}
+
+final _letter = RegExp(r'^[\p{L}\p{N}]+$', unicode: true);
+
+const _plain = {'à': 'a', 'á': 'a', 'â': 'a', 'ã': 'a', 'ä': 'a', 'å': 'a', 'ā': 'a', 'ă': 'a', 'ą': 'a', 'ç': 'c', 'ć': 'c', 'ĉ': 'c', 'ċ': 'c', 'č': 'c', 'ď': 'd', 'đ': 'd', 'è': 'e', 'é': 'e', 'ê': 'e', 'ë': 'e', 'ē': 'e', 'ĕ': 'e', 'ė': 'e', 'ę': 'e', 'ě': 'e', 'ĝ': 'g', 'ğ': 'g', 'ġ': 'g', 'ģ': 'g', 'ĥ': 'h', 'ħ': 'h', 'ì': 'i', 'í': 'i', 'î': 'i', 'ï': 'i', 'ĩ': 'i', 'ī': 'i', 'ĭ': 'i', 'į': 'i', 'ı': 'i', 'ĵ': 'j', 'ķ': 'k', 'ĺ': 'l', 'ļ': 'l', 'ľ': 'l', 'ŀ': 'l', 'ł': 'l', 'ñ': 'n', 'ń': 'n', 'ņ': 'n', 'ň': 'n', 'ŉ': 'n', 'ò': 'o', 'ó': 'o', 'ô': 'o', 'õ': 'o', 'ö': 'o', 'ø': 'o', 'ō': 'o', 'ŏ': 'o', 'ő': 'o', 'ŕ': 'r', 'ŗ': 'r', 'ř': 'r', 'ś': 's', 'ŝ': 's', 'ş': 's', 'š': 's', 'ţ': 't', 'ť': 't', 'ŧ': 't', 'ù': 'u', 'ú': 'u', 'û': 'u', 'ü': 'u', 'ũ': 'u', 'ū': 'u', 'ŭ': 'u', 'ů': 'u', 'ű': 'u', 'ų': 'u', 'ŵ': 'w', 'ý': 'y', 'ÿ': 'y', 'ŷ': 'y', 'ź': 'z', 'ż': 'z', 'ž': 'z', 'æ': 'ae', 'œ': 'oe', 'ß': 'ss', 'ð': 'd', 'þ': 'th'};
+
+/// Does a search hit look like the song? Words of the wrong song are worse than none.
+bool sameSong(String title, String artist, int dur, String title2, String artist2, int dur2) {
+  if (dur > 0 && dur2 > 0 && (dur - dur2).abs() > 6) return false;
+  final a = folded(title), b = folded(title2), x = folded(artist), y = folded(artist2);
+  if (a.isEmpty || b.isEmpty || !(a.contains(b) || b.contains(a))) return false;
+  return x.isEmpty || y.isEmpty || x.contains(y) || y.contains(x) || x.split(' ').toSet().intersection(y.split(' ').toSet()).isNotEmpty;
+}
+
+/// The words in a Genius lyrics page: what's inside its lyrics boxes, without the header Genius puts in
+/// the first one (contributors, translations, a blurb about the song), and without [Chorus] and friends.
+String geniusText(String page) {
+  final out = StringBuffer();
+  final tag = RegExp(r'<(/?)(div|br)\b([^>]*)>', caseSensitive: false);
+  var depth = 0; // how deep inside a lyrics box, 0 outside
+  var skip = 0; // how deep inside its header, 0 when not in it
+  var at = 0;
+  for (final m in tag.allMatches(page)) {
+    if (depth > 0 && skip == 0) out.write(page.substring(at, m.start).replaceAll(RegExp(r'<[^>]+>'), ''));
+    at = m.end;
+    final closing = m.group(1) == '/';
+    final name = m.group(2)!.toLowerCase();
+    final attrs = m.group(3) ?? '';
+    if (name == 'br') {
+      if (depth > 0 && skip == 0) out.write('\n');
+    } else if (closing) {
+      if (depth > 0) {
+        depth--;
+        if (skip > 0) skip--;
+      }
+    } else if (depth > 0) {
+      depth++;
+      if (skip > 0) {
+        skip++;
+      } else if (attrs.contains('data-exclude-from-selection="true"')) {
+        skip = 1;
+      }
+    } else if (attrs.contains('data-lyrics-container="true"')) {
+      depth = 1;
+      out.write('\n');
+    }
+  }
+  final lines = [
+    for (final l in const LineSplitter().convert(_entities(out.toString())))
+      if (!(l.trim().startsWith('[') && l.trim().endsWith(']'))) l.trim(),
+  ];
+  return lines.join('\n').replaceAll(RegExp(r'\n{3,}'), '\n\n').trim();
+}
+
+String _entities(String s) => s
+    .replaceAll('&amp;', '&')
+    .replaceAll('&#x27;', "'")
+    .replaceAll('&#39;', "'")
+    .replaceAll('&quot;', '"')
+    .replaceAll('&lt;', '<')
+    .replaceAll('&gt;', '>')
+    .replaceAllMapped(RegExp(r'&#(\d+);'), (m) => String.fromCharCode(int.parse(m.group(1)!)));
+
+/// Lyrics in the phone's own language, a few lines at a time, from the free MyMemory service (what the
+/// computer uses too). Lines it can't translate stay as they are.
+class Translator {
+  Translator({http.Client? client}) : _http = client ?? http.Client();
+
+  final http.Client _http;
+  final _done = <String, List<String>>{};
+
+  static Translator the = Translator();
+
+  /// The language to translate into: the phone's.
+  static String get language => PlatformDispatcher.instance.locale.languageCode;
+
+  Future<List<String>> lines(List<String> lines, {String? into}) async {
+    final lang = into ?? language;
+    final key = '$lang|${lines.join('\n')}';
+    final known = _done[key];
+    if (known != null) return known;
+    final chunks = <List<String>>[[]];
+    var size = 0;
+    for (final l in lines) {
+      if (size + l.length > 440 && chunks.last.isNotEmpty) {
+        chunks.add([]);
+        size = 0;
+      }
+      chunks.last.add(l);
+      size += l.length + 1;
+    }
+    final out = <String>[];
+    for (final c in chunks) {
+      final text = c.join('\n');
+      if (text.trim().isEmpty) {
+        out.addAll(c);
+        continue;
+      }
+      try {
+        final res = await _http
+            .get(Uri.https('api.mymemory.translated.net', '/get', {'q': text, 'langpair': 'autodetect|$lang'}))
+            .timeout(const Duration(seconds: 12));
+        final j = asMap(jsonDecode(utf8.decode(res.bodyBytes)));
+        final got = '${asMap(j['responseData'])['translatedText'] ?? ''}';
+        final ok = toInt(j['responseStatus']) == 200 && got.isNotEmpty && !got.contains('DISTINCT LANGUAGES');
+        final back = ok ? const LineSplitter().convert(_entities(got)) : c;
+        // the same number of lines back, or the lines can't be put next to each other
+        out.addAll(back.length == c.length ? back : c);
+      } on Object {
+        out.addAll(c);
+      }
+    }
+    _done[key] = out;
+    return out;
+  }
+}
+
 class LyricsFinder {
   LyricsFinder({http.Client? client}) : _http = client ?? http.Client();
 
@@ -142,10 +270,100 @@ class LyricsFinder {
           plain ??= parsePlainLyrics(await YouTube.inner.browseRaw(next.lyrics));
         }
       } on Object {
-        // nothing more to try
+        // on to the next ones
       }
     }
-    return plain;
+    for (final synced in [_netease, _kugou]) {
+      try {
+        final l = await synced(title, artist, t.dur);
+        if (l != null) return l;
+      } on Object {
+        // that one is down or slow
+      }
+    }
+    if (plain != null) return plain;
+    for (final words in [_genius, _ovh]) {
+      try {
+        final l = await words(title, artist, t.dur);
+        if (l != null) return l;
+      } on Object {
+        // and that one
+      }
+    }
+    return null;
+  }
+
+  static const _browser = {
+    'User-Agent': 'Mozilla/5.0 (Linux; Android 14) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Mobile Safari/537.36',
+  };
+
+  Future<Map<String, Object?>> _json(Uri uri, {Map<String, String> headers = _browser}) async {
+    final res = await _http.get(uri, headers: headers).timeout(const Duration(seconds: 8));
+    if (res.statusCode != 200) return const {};
+    return asMap(jsonDecode(utf8.decode(res.bodyBytes)));
+  }
+
+  Future<Lyrics?> _netease(String title, String artist, int dur) async {
+    final head = {..._browser, 'Referer': 'https://music.163.com/'};
+    final d = await _json(Uri.https('music.163.com', '/api/search/get', {'type': '1', 'limit': '8', 's': '$title $artist'}), headers: head);
+    for (final x in asList(asMap(d['result'])['songs']).take(8)) {
+      final song = asMap(x);
+      final who = [for (final a in asList(song['artists'])) '${asMap(a)['name'] ?? ''}'].join(' ');
+      if (!sameSong(title, artist, dur, '${song['name'] ?? ''}', who, toInt(song['duration']) ~/ 1000)) continue;
+      final got = await _json(Uri.https('music.163.com', '/api/song/lyric', {'id': '${song['id']}', 'lv': '1', 'kv': '1', 'tv': '-1'}),
+          headers: head);
+      final l = parseLrc('${asMap(got['lrc'])['lyric'] ?? ''}', source: 'NetEase');
+      if (l != null && l.lines.any((w) => w != '♪')) return l;
+    }
+    return null;
+  }
+
+  Future<Lyrics?> _kugou(String title, String artist, int dur) async {
+    final d = await _json(Uri.https('krcs.kugou.com', '/search', {
+      'ver': '1',
+      'man': 'yes',
+      'client': 'mobi',
+      'keyword': artist.isEmpty ? title : '$artist - $title',
+      'duration': '${dur * 1000}',
+      'hash': '',
+    }));
+    for (final x in asList(d['candidates']).take(3)) {
+      final c = asMap(x);
+      if (!sameSong(title, artist, dur, '${c['song'] ?? ''}', '${c['singer'] ?? ''}', toInt(c['duration']) ~/ 1000)) continue;
+      final got = await _json(Uri.https('lyrics.kugou.com', '/download', {
+        'ver': '1',
+        'client': 'pc',
+        'id': '${c['id']}',
+        'accesskey': '${c['accesskey']}',
+        'fmt': 'lrc',
+        'charset': 'utf8',
+      }));
+      final text = utf8.decode(base64.decode('${got['content'] ?? ''}'), allowMalformed: true);
+      final l = parseLrc(text, source: 'KuGou');
+      if (l != null && l.lines.any((w) => w != '♪')) return l;
+    }
+    return null;
+  }
+
+  Future<Lyrics?> _genius(String title, String artist, int dur) async {
+    final d = await _json(Uri.https('genius.com', '/api/search/song', {'per_page': '5', 'q': '$title $artist'}));
+    for (final sec in asList(asMap(d['response'])['sections'])) {
+      for (final hit in asList(asMap(sec)['hits'])) {
+        final r = asMap(asMap(hit)['result']);
+        final who = '${r['primary_artist_names'] ?? r['artist_names'] ?? ''}';
+        if (r['instrumental'] == true || !sameSong(title, artist, 0, '${r['title'] ?? ''}', who, 0)) continue;
+        final page = await _http.get(Uri.parse('${r['url']}'), headers: _browser).timeout(const Duration(seconds: 10));
+        final text = geniusText(utf8.decode(page.bodyBytes, allowMalformed: true));
+        if (text.isNotEmpty) return Lyrics(const LineSplitter().convert(text), source: 'Genius');
+      }
+    }
+    return null;
+  }
+
+  Future<Lyrics?> _ovh(String title, String artist, int dur) async {
+    final d = await _json(Uri.parse('https://api.lyrics.ovh/v1/${Uri.encodeComponent(artist)}/${Uri.encodeComponent(title)}'));
+    final text = '${d['lyrics'] ?? ''}'.trim();
+    return text.isEmpty ? null : Lyrics(const LineSplitter().convert(text), source: 'lyrics.ovh');
   }
 
   Future<(Lyrics?, Lyrics?)> _lrclib(String title, String artist, int dur, String album) async {
