@@ -1,9 +1,15 @@
-**New in 0.2.0**
+**New in 0.3.0**
 
-- A new look in the spirit of YouTube Music and Spotify: Home with quick picks, mixes and shelves, a search that suggests while you type (with filters and pages for artists and albums), and a library of cassettes.
-- The player switches between the song, its tape and the music video, with lyrics that follow along, a sleep timer and the speed.
-- Whole tapes, albums or single songs saved on the phone, for when there's no internet.
-- Samples: songs from their best half minute, one after the other.
-- Listening along with a friend, rooms and parties, the same ones as on the computer. Mixtape on the computer also shows the phone's song on Discord.
-- The tape studio, your listening stats and a Wrapped for the month and the year.
-- A new icon, and help for phones whose battery manager stops music in the background (Xiaomi, Samsung, Huawei, Honor, Oppo, Realme, OnePlus, Vivo, Tecno, Infinix and others).
+- Decorate your tapes on the phone: stickers from the sticker sheet, photos, sticky notes, washi tape, label-maker strips and the pen, with undo. They look the same on the computer, and what the computer sticks on shows here.
+- Widgets for the home screen: Cassette, Now playing, Cover, My tapes and a mini player on Android, the first four on the iPhone too, and the mini player on its lock screen.
+- Crossfade in the computer's four shapes, albums that play straight through, and a radio that keeps going with songs like the last ones when the queue runs out.
+- A countdown to every line of the lyrics, and finding a song by a line you remember.
+- Rewind with last month too, ending on a J-card to share or to turn into a tape.
+- Playlists from Spotify, YouTube, YouTube Music and Deezer (or a CSV file, or a list of songs) become tapes, and podcasts come in with their newest episodes.
+- Profiles with a picture, pronouns, your color and a song and a tape on show. Party DJs, reactions that float up, and catching up with a friend you listen along with.
+- Listen along with someone on Spotify or YouTube Music through ListenBrainz or Last.fm, and send what you play to ListenBrainz.
+- Artist radio, "Songs like this", Samples on every artist page, and a menu on album and artist cards too.
+- Your library in a file, the same one the computer saves with Ctrl+E: save it, or take one in.
+- Music files on the phone play in Mixtape: open them with it from the files app, share them to it, or pick them in Add music.
+- The computer's keys on a keyboard (Samsung DeX, a tablet, a Chromebook): Space, Ctrl+F, Ctrl+P and the rest.
+- A new icon, and every page checked on eight phones (Samsung Galaxy phones above all), so nothing hides under the phone's bars or runs off the screen.

@@ -137,7 +137,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.name.outputs.version }}
         run: |
-          notes="Mixtape $VERSION for phones: your tapes and liked songs from the Mixtape Account, YouTube Music search, music that keeps playing with the screen off, the notification and lock screen keys, and on Android a home screen widget.
+          notes="Mixtape $VERSION for phones: your tapes and liked songs from the Mixtape Account, YouTube Music search, music that keeps playing with the screen off, the notification and lock screen keys, and widgets for the home screen.
 
           **Android 7 and newer:** install Mixtape-$VERSION.apk (a phone from before 2017 or so may need Mixtape-$VERSION-older-phones.apk).
 

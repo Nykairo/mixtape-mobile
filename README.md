@@ -33,9 +33,13 @@ With a free Apple ID the signature lasts seven days, and AltStore or SideStore r
 - **Search** that finds things: words offered while you type, what you searched before, a top result,
   filters for songs, videos, albums, artists and playlists, and pages for every artist and album.
 - **The player**: the song, its tape or its music video (lined up with the song by YouTube's "most
-  replayed" curve), lyrics that scroll along (tap a line to jump there), what comes next, related songs,
-  a sleep timer (in minutes or at the end of the song) and the speed. Swipe the little player for the
-  next song.
+  replayed" curve), lyrics that scroll along (tap a line to jump there, a little clock counts down to
+  the next one, Translate puts them into your language), what comes next, related songs, a sleep timer
+  (in minutes or at the end of the song) and the speed. Swipe the little player for the next song, and
+  save the queue as a tape.
+- **Between songs**: a crossfade in the computer's four shapes (smooth, linear, DJ, gentle), albums
+  that play straight through, and a radio that keeps going with songs like the last ones. Every song
+  has "Songs like this" and a radio, every artist a radio and Samples.
 - **Samples**: one song at a time on the whole screen, from its best half minute, round and round until
   you flick to the next one. Like it, put it on a tape, play it whole or say it's not for you. The music
   that was on waits and carries on after.
@@ -45,15 +49,32 @@ With a free Apple ID the signature lasts seven days, and AltStore or SideStore r
   or throw a party where the guests ask for songs and the host picks. These are the same rooms as on
   the computer, so phones and computers can sit in one.
 - **Your tapes**, drawn like on the computer, with the tape studio for the shell, the label, the reels
-  and the sticky note. Pin tapes to the top, sort them, see them as a list or as cassettes.
-- **Your listening**: minutes, top songs and artists, the hours you listen at, your streak, and a
-  Wrapped for the month and the year, told in cards you tap through.
+  and the sticky note, and everything to stick on them: stickers from the sticker sheet, photos,
+  sticky notes, washi tape, label-maker strips and the pen. What's stuck on a tape shows on the
+  computer too, and the other way round. Pin tapes to the top, sort them, see them as a list or as
+  cassettes.
+- **Add music**: playlists from Spotify, YouTube, YouTube Music and Deezer (or a CSV file, or a list of
+  songs) become tapes; podcasts come in with their newest episodes; music files on the phone play
+  right away (also opened with Mixtape from the files app, or shared to it).
+- **Your listening**: minutes, top songs and artists, the hours you listen at, your streak, and Rewind
+  for this month, last month and the year, told in cards you tap through and ending on a J-card to
+  share or turn into a tape. What you play can go to ListenBrainz.
+- **Profiles**: yours with a picture, your pronouns, a few lines, your color and a song and a tape on
+  show; anyone else's to look up, listen along with or invite.
+- **Your library in a file**: the same file as the computer's Export library (Ctrl+E there), saved
+  from Settings or taken in from one.
 - **Not interested**: a song you don't want stops coming up in mixes, radios and Samples.
+- **Widgets**: Cassette, Now playing, Cover, My tapes and a mini player for the home screen on Android;
+  the first four on the iPhone too, and the mini player on its lock screen.
+- **A keyboard** (Samsung DeX, a tablet, a Chromebook) has the computer's keys: Space plays or pauses,
+  Ctrl+Left and Ctrl+Right jump, Ctrl+F searches, Ctrl+P opens the player, Ctrl+N makes a tape,
+  Alt+Left goes back, Ctrl+E and Ctrl+I save or take in the library, Ctrl+Shift+L is Listen together.
 - Keeps playing with the screen off, with its keys in the notification, on the lock screen, on
-  headphones and in a home screen widget (Android). Picks up where you left off.
+  headphones and on the widgets. Picks up where you left off.
 
-Not yet: a home screen widget on the iPhone (the lock screen and Control Center show the song and its
-keys), and Cass, the DJ from the computer.
+Not on the phone: Cass, the DJ from the computer (it runs a language model on the computer itself),
+the song pop-up and the mini player window, which are the computer's own. Songs a tape got from
+SoundCloud play on the computer only.
 
 ## How it's built
 
@@ -64,7 +85,8 @@ Flutter for the screens, [just_audio](https://pub.dev/packages/just_audio) and
 `packages/mixtape_native`) for the addresses of songs and videos. On the iPhone, and on Android when
 NewPipe can't, `lib/innertube.dart` asks YouTube Music directly, the way its own apps do;
 `lib/music.dart` reads what comes back (search, home, artists, albums, radios, lyrics). The Android
-widget is a plain app widget, drawn in Kotlin.
+widgets are plain app widgets, drawn in Kotlin. The iPhone's are WidgetKit (`ios-extras/widgets`),
+added to the project Flutter makes by `ios-extras/add_widgets.rb`; their keys run inside the app.
 
 YouTube addresses run out after a few hours, so a song's bytes come through a small reader in
 `lib/audio.dart` that looks the address up again when YouTube stops taking it and carries on where a
@@ -87,7 +109,15 @@ flutter build apk --release
 ```
 
 The first line only adds the files Flutter makes for every Android app (the Gradle wrapper); nothing
-here is overwritten.
+here is overwritten. For the iPhone, on a Mac:
+
+```sh
+flutter create --platforms=ios --org dev.softwarevault --project-name mixtape .
+bash ios-extras/setup.sh
+flutter build ios --release --no-codesign
+```
+
+`setup.sh` puts in the app's icon, its settings and the widgets.
 
 ## License
 
