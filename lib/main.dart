@@ -3,6 +3,8 @@
 /// with the screen off, with a notification and (on Android) a home screen widget.
 library;
 
+import 'dart:async';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -21,6 +23,7 @@ import 'settings.dart';
 import 'store.dart';
 import 'together.dart';
 import 'ui/keys.dart';
+import 'ui/now_playing.dart';
 import 'ui/shell.dart';
 import 'video.dart';
 
@@ -53,17 +56,26 @@ Future<void> main() async {
       notificationColor: Look.accent,
       androidStopForegroundOnPause: true,
       preloadArtwork: true,
-      artDownscaleWidth: 512,
-      artDownscaleHeight: 512,
+      // the cover fills the whole music card on newer phones; one with little memory keeps it smaller
+      artDownscaleWidth: PhoneInfo.the.lowRam ? 512 : 720,
+      artDownscaleHeight: PhoneInfo.the.lowRam ? 512 : 720,
     ),
   );
   audio.autoplay = settings.autoplay;
   audio.setCrossfade(settings.crossfade, shape: settings.fadeShape, albums: settings.albumsWhole);
+  audio.cardKeys = settings.cardKeys;
   // what changes in the settings reaches the player at once
   settings.addListener(() {
     audio.autoplay = settings.autoplay;
     audio.setCrossfade(settings.crossfade, shape: settings.fadeShape, albums: settings.albumsWhole);
+    audio.cardKeys = settings.cardKeys;
+    audio.refreshCard();
   });
+  // the music card's heart and its "Not for me" (and the heart again when a song is liked in the app)
+  audio.isLiked = library.isLiked;
+  audio.toggleLike = library.toggleLike;
+  audio.hideSong = (t) => library.hide(t, true);
+  library.addListener(audio.refreshCard);
   final scrobbler = Scrobbler(settings, version: appVersion);
   audio.onPlayed = (t) {
     library.played(t);
@@ -105,12 +117,20 @@ class MixtapeApp extends StatefulWidget {
 class _MixtapeAppState extends State<MixtapeApp> with WidgetsBindingObserver {
   DateTime _away = DateTime.now();
   bool? _big;
+  StreamSubscription<bool>? _cardTaps;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _turning();
+    // a tap on the music card (lock screen, notification) opens the big player, like the other music apps
+    _cardTaps = AudioService.notificationClicked.where((tapped) => tapped).listen((_) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        final context = Shell.stateKey.currentContext;
+        if (context != null && App.audio.current != null && !NowPlaying.showing) NowPlaying.open(context);
+      });
+    });
   }
 
   /// Phones stay upright, like the music apps next to them; a tablet or an unfolded foldable turns with
@@ -130,6 +150,7 @@ class _MixtapeAppState extends State<MixtapeApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    _cardTaps?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }

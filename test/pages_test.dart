@@ -8,9 +8,11 @@ library;
 
 import 'dart:async';
 
+import 'package:audio_service/audio_service.dart' show MediaAction;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:just_audio/just_audio.dart' show LoopMode;
 import 'package:mixtape/app.dart';
 import 'package:mixtape/audio.dart';
 import 'package:mixtape/cassette.dart';
@@ -445,6 +447,117 @@ void main() {
     await wait(tester);
     expect(find.byType(NowPlaying), findsNothing);
     await close(tester);
+  });
+
+  testWidgets('The music card: its own keys next to play, what they do, and picking them', (tester) async {
+    await pumpApp(tester);
+    await Box.startMusic(tester);
+    final audio = App.audio;
+    final t = audio.current!;
+    final wasLiked = App.library.isLiked(t);
+    List<String> own() => [
+          for (final c in audio.playbackState.value.controls)
+            if (c.action == MediaAction.custom) c.androidIcon.replaceFirst('drawable/', ''),
+        ];
+    // (the player lives outside the test's clock: what it says back only arrives while real time runs)
+    Future<void> press(String key) async {
+      await tester.runAsync(() async {
+        await audio.customAction(key);
+        await Future<void>.delayed(const Duration(milliseconds: 80));
+      });
+      await tester.pump();
+    }
+
+    // the three keys every card has, then the two picked in the settings: the heart and shuffle
+    final every = audio.playbackState.value.controls;
+    expect(every.first.action, MediaAction.skipToPrevious);
+    expect(every[2].action, MediaAction.skipToNext);
+    expect(own(), [wasLiked ? 'card_liked' : 'card_like', 'card_shuffle']);
+
+    // the heart likes the song that plays and fills up; pressed again, all is as it was
+    await press('like');
+    expect(App.library.isLiked(t), !wasLiked);
+    expect(own().first, wasLiked ? 'card_like' : 'card_liked');
+    await press('like');
+    expect(App.library.isLiked(t), wasLiked);
+
+    await press('shuffle');
+    expect(audio.player.shuffleModeEnabled, isTrue);
+    expect(own().last, 'card_shuffle_on');
+    await press('shuffle');
+    expect(audio.player.shuffleModeEnabled, isFalse);
+    expect(own().last, 'card_shuffle');
+
+    // picked in the settings, in order: a third one pushes out the first
+    Shell.push(const Scaffold(body: CardKeys()));
+    await wait(tester);
+    await tester.tap(find.text('Repeat'));
+    await wait(tester);
+    expect(App.settings.cardKeys, ['shuffle', 'repeat']);
+    await tester.tap(find.text('Stop after this song'));
+    await wait(tester);
+    expect(App.settings.cardKeys, ['repeat', 'sleep']);
+    expect(find.descendant(of: find.byType(CardKeys), matching: find.text('1')), findsOneWidget);
+    expect(find.descendant(of: find.byType(CardKeys), matching: find.text('2')), findsOneWidget);
+    await shot(tester, 'card_keys');
+    audio.cardKeys = App.settings.cardKeys; // (the app's main hands them over on every change)
+    audio.refreshCard();
+    expect(own(), ['card_repeat', 'card_sleep']);
+
+    // repeat goes round: the queue, this song, off
+    await press('repeat');
+    expect(audio.player.loopMode, LoopMode.all);
+    expect(own().first, 'card_repeat_all');
+    await press('repeat');
+    expect(audio.player.loopMode, LoopMode.one);
+    expect(own().first, 'card_repeat_one');
+    await press('repeat');
+    expect(audio.player.loopMode, LoopMode.off);
+
+    // the moon: the music stops after this song; pressed again, it plays on
+    await press('sleep');
+    expect(audio.sleepAtEnd, isTrue);
+    expect(own().last, 'card_sleep_on');
+    await press('sleep');
+    expect(audio.sleepAtEnd, isFalse);
+    expect(own().last, 'card_sleep');
+
+    // back to the heart and shuffle
+    for (final k in ['repeat', 'sleep', 'like', 'shuffle']) {
+      App.settings.toggleCardKey(k);
+    }
+    expect(App.settings.cardKeys, ['like', 'shuffle']);
+    audio.cardKeys = App.settings.cardKeys;
+
+    // a podcast has a jump back and one ahead there instead
+    const episode = Track(src: 'pod', ref: 'https://example.com/episode-12.mp3', title: 'Episode 12', dur: 1800);
+    await tester.runAsync(() async {
+      await audio.playSongs([episode]);
+      await audio.seek(const Duration(minutes: 5));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    expect(own(), ['card_back_10', 'card_ahead_30']);
+    await press('back');
+    expect(audio.player.position.inSeconds, inInclusiveRange(289, 293));
+    await press('ahead');
+    expect(audio.player.position.inSeconds, inInclusiveRange(319, 323));
+
+    // a file on the phone can't be liked or waved off: only shuffle is left for it
+    const file = Track(src: 'file', ref: 'content://media/external/audio/media/41', title: 'A file', dur: 200);
+    await tester.runAsync(() async {
+      await audio.playSongs([file]);
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    expect(own(), ['card_shuffle']);
+
+    // a tap on the card opens the big player, once
+    await Box.startMusic(tester);
+    expect(NowPlaying.showing, isFalse);
+    unawaited(NowPlaying.open(inside(tester)));
+    await wait(tester);
+    expect(NowPlaying.showing, isTrue);
+    await close(tester);
+    expect(NowPlaying.showing, isFalse);
   });
 
   testWidgets('Together: the ways in, listening along, a room and a party', (tester) async {

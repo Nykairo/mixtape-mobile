@@ -1,8 +1,8 @@
 /// What can be set on the phone: the tape stock (the color of what plays), whether the music goes on
 /// with songs like the last one when a list runs out (the radio), the crossfade between songs, the
 /// lyrics' countdown, whether friends can listen along, what the big player shows (cover, tape or the
-/// music video), how the library shows, and whether the word about the phone's battery manager was
-/// answered.
+/// music video), the keys on the music card, how the library shows, and whether the word about the
+/// phone's battery manager was answered.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -13,6 +13,16 @@ import 'store.dart';
 
 const _file = 'settings.json';
 const _views = {'cover', 'tape', 'video'};
+
+/// What the music card (the lock screen's and the notification's player) can have next to play, as
+/// the settings name them. Android 13 and newer show two of them.
+const cardKeyNames = {
+  'like': 'Like',
+  'shuffle': 'Shuffle',
+  'repeat': 'Repeat',
+  'hide': 'Not for me',
+  'sleep': 'Stop after this song',
+};
 
 class Settings extends ChangeNotifier {
   String get stock => Look.stock;
@@ -46,6 +56,9 @@ class Settings extends ChangeNotifier {
   /// mode stays on from one song (and one start of the app) to the next.
   String playerView = 'cover';
 
+  /// The keys of [cardKeyNames] the music card shows next to play, in their order (two at most).
+  List<String> cardKeys = const ['like', 'shuffle'];
+
   /// The library as a grid of cassettes (or a list), and how it's sorted: 'recent', 'name' or 'songs'.
   bool grid = false;
   String sort = 'recent';
@@ -68,6 +81,7 @@ class Settings extends ChangeNotifier {
         'lastfm_key': lastFmKey,
         'rewind_seen': rewindSeen,
         'player_view': playerView,
+        'card_keys': cardKeys,
         'grid': grid,
         'sort': sort,
         'background_tip_done': backgroundTipDone,
@@ -93,6 +107,14 @@ class Settings extends ChangeNotifier {
       rewindSeen = '${j['rewind_seen'] ?? ''}';
       final view = j['player_view'];
       if (view is String && _views.contains(view)) playerView = view;
+      final keys = j['card_keys'];
+      if (keys is List) {
+        final seen = <String>{};
+        cardKeys = List.unmodifiable([
+          for (final k in keys)
+            if (k is String && cardKeyNames.containsKey(k) && seen.add(k)) k,
+        ].take(2));
+      }
       grid = j['grid'] == true;
       final order = j['sort'];
       if (order is String && const {'recent', 'name', 'songs'}.contains(order)) sort = order;
@@ -129,6 +151,20 @@ class Settings extends ChangeNotifier {
   void setPlayerView(String view) {
     if (view == playerView || !_views.contains(view)) return;
     playerView = view;
+    _save.soon();
+    notifyListeners();
+  }
+
+  /// Puts [key] on the music card, or takes it off when it's there. A third one pushes out the one
+  /// that was picked first.
+  void toggleCardKey(String key) {
+    if (!cardKeyNames.containsKey(key)) return;
+    final keys = List.of(cardKeys);
+    if (!keys.remove(key)) {
+      keys.add(key);
+      if (keys.length > 2) keys.removeAt(0);
+    }
+    cardKeys = List.unmodifiable(keys);
     _save.soon();
     notifyListeners();
   }

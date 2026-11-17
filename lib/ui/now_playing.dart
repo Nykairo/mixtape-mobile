@@ -37,6 +37,10 @@ class NowPlaying extends StatefulWidget {
         ),
       ));
 
+  /// The big player is open (a tap on the music card then doesn't open a second one).
+  static bool get showing => _open > 0;
+  static int _open = 0;
+
   @override
   State<NowPlaying> createState() => _NowPlayingState();
 }
@@ -44,6 +48,18 @@ class NowPlaying extends StatefulWidget {
 class _NowPlayingState extends State<NowPlaying> {
   double? _dragging; // where the seek slider is held, in seconds
   double _pull = 0; // how far the page is pulled down to close it
+
+  @override
+  void initState() {
+    super.initState();
+    NowPlaying._open++;
+  }
+
+  @override
+  void dispose() {
+    NowPlaying._open--;
+    super.dispose();
+  }
 
   /// What the top shows: 'cover', 'tape' or 'video' (a setting: it stays for the next song and the
   /// next start of the app).

@@ -359,6 +359,14 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   /// While listening along or in a room, the keys go there instead (together.dart): true when taken.
   bool Function(String key, [Duration? at])? steer;
 
+  /// The music card's own keys next to play (settings.dart's cardKeyNames, Android 13 and newer show
+  /// two), and what they need from the library: whether a song is liked, liking it, not wanting it.
+  List<String> cardKeys = const ['like', 'shuffle'];
+  bool Function(Track)? isLiked;
+  bool Function(Track)? toggleLike;
+  void Function(Track)? hideSong;
+  String _cardShown = '';
+
   /// Where the music comes from, for "Playing from" ('Liked songs', a tape's name, 'Search'...), and
   /// the tape's own name when it's a tape, so the big player can show that cassette.
   String from = '';
@@ -408,6 +416,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
     _player.currentIndexStream.listen(_moved);
     _player.shuffleModeEnabledStream.listen((_) => _broadcast(_player.playbackEvent));
     _player.loopModeStream.listen((_) => _broadcast(_player.playbackEvent));
+    sleepNews.stream.listen((_) => refreshCard());
     _player.playingStream.listen((playing) {
       _keepSaving(playing);
       if (!playing) _endBlend(); // a call or a headset pulled out: the end of the last song goes quiet too
@@ -437,7 +446,8 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
         artist: t.artist,
         album: t.album.isEmpty ? null : t.album,
         duration: t.dur > 0 ? Duration(seconds: t.dur) : null,
-        artUri: _artUri(t.artAt(544)),
+        // big enough for the cover behind the whole music card
+        artUri: _artUri(t.artAt(720)),
       );
 
   /// A cover on the internet, or (a phone file's own) in a file here.
@@ -630,11 +640,14 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
     final playing = _player.playing;
     if (_player.processingState == ProcessingState.ready) _retries = 0; // it plays: trouble is over
     final queueIndex = event.currentIndex;
+    final own = _cardKeys();
+    _cardShown = own.map((k) => k.androidIcon).join(' ');
     playbackState.add(playbackState.value.copyWith(
       controls: [
         MediaControl.skipToPrevious,
         if (playing) MediaControl.pause else MediaControl.play,
         MediaControl.skipToNext,
+        ...own,
       ],
       systemActions: const {MediaAction.seek, MediaAction.seekForward, MediaAction.seekBackward},
       androidCompactActionIndices: const [0, 1, 2],
@@ -657,6 +670,88 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
         LoopMode.all: AudioServiceRepeatMode.all,
       }[_player.loopMode]!,
     ));
+  }
+
+  /// The music card's own keys, as they stand for the song that plays: the ones picked in the settings
+  /// (a phone's own file can't be liked or waved off, so those stay away for it). A podcast gets a jump
+  /// back and one ahead instead, the way podcast apps have them.
+  List<MediaControl> _cardKeys() {
+    final t = current;
+    if (t == null) return const [];
+    if (t.src == 'pod') {
+      return [_key('back', 'Back 10 seconds', 'card_back_10'), _key('ahead', 'Ahead 30 seconds', 'card_ahead_30')];
+    }
+    return [
+      for (final k in cardKeys)
+        if (_cardKey(k, t) case final key?) key,
+    ];
+  }
+
+  MediaControl? _cardKey(String k, Track t) {
+    final liked = isLiked;
+    return switch (k) {
+      'like' when !t.fromPhone && liked != null =>
+        liked(t) ? _key('like', 'Liked', 'card_liked') : _key('like', 'Like', 'card_like'),
+      'shuffle' => _player.shuffleModeEnabled
+          ? _key('shuffle', 'Shuffle is on', 'card_shuffle_on')
+          : _key('shuffle', 'Shuffle', 'card_shuffle'),
+      'repeat' => switch (_player.loopMode) {
+          LoopMode.off => _key('repeat', 'Repeat', 'card_repeat'),
+          LoopMode.all => _key('repeat', 'Repeats the queue', 'card_repeat_all'),
+          LoopMode.one => _key('repeat', 'Repeats this song', 'card_repeat_one'),
+        },
+      'hide' when !t.fromPhone && hideSong != null => _key('hide', 'Not for me', 'card_not_for_me'),
+      'sleep' => sleepAt != null || sleepAtEnd
+          ? _key('sleep', 'Sleep timer is on', 'card_sleep_on')
+          : _key('sleep', 'Stop after this song', 'card_sleep'),
+      _ => null,
+    };
+  }
+
+  static MediaControl _key(String name, String label, String icon) =>
+      MediaControl.custom(androidIcon: 'drawable/$icon', label: label, name: name);
+
+  /// The music card again, when one of its keys looks different now (a song liked in the app, say).
+  void refreshCard() {
+    if (_cardKeys().map((k) => k.androidIcon).join(' ') != _cardShown) _broadcast(_player.playbackEvent);
+  }
+
+  /// A key of the music card was pressed (see [_cardKeys]).
+  @override
+  Future<dynamic> customAction(String name, [Map<String, dynamic>? extras]) async {
+    final t = current;
+    if (t == null) return;
+    switch (name) {
+      case 'like':
+        toggleLike?.call(t);
+      case 'shuffle':
+        if (steer?.call('shuffle') ?? false) return;
+        await setShuffleMode(_player.shuffleModeEnabled ? AudioServiceShuffleMode.none : AudioServiceShuffleMode.all);
+      case 'repeat':
+        if (steer?.call('repeat') ?? false) return;
+        await _player.setLoopMode(switch (_player.loopMode) {
+          LoopMode.off => LoopMode.all,
+          LoopMode.all => LoopMode.one,
+          LoopMode.one => LoopMode.off,
+        });
+      case 'hide':
+        hideSong?.call(t);
+        await skipToNext();
+      case 'sleep':
+        if (sleepAt != null || sleepAtEnd) {
+          sleepOff();
+        } else {
+          sleepAfterSong();
+        }
+      case 'back':
+        final back = _player.position - const Duration(seconds: 10);
+        await seek(back < Duration.zero ? Duration.zero : back);
+      case 'ahead':
+        final ahead = _player.position + const Duration(seconds: 30);
+        final end = _player.duration;
+        await seek(end != null && ahead > end ? end : ahead);
+    }
+    refreshCard();
   }
 
   /// A song wouldn't load. A song YouTube won't give is skipped with a word about it; when it's the

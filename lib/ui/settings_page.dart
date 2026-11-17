@@ -1,5 +1,5 @@
-/// Settings: the tape stock, music that keeps going, whether friends can listen along, the songs saved
-/// on the phone, the account, and what Mixtape is made of.
+/// Settings: the tape stock, music that keeps going, the keys on the music card, whether friends can
+/// listen along, the songs saved on the phone, the account, and what Mixtape is made of.
 library;
 
 import 'dart:io';
@@ -12,6 +12,7 @@ import '../blend.dart';
 import '../look.dart';
 import '../phone.dart';
 import '../scrobble.dart';
+import '../settings.dart';
 import 'pages.dart';
 import 'profile_page.dart';
 import 'shell.dart';
@@ -161,6 +162,8 @@ class SettingsPage extends StatelessWidget {
             if (Platform.isAndroid) ...[
               const SectionTitle('With the screen off'),
               ListenableBuilder(listenable: PhoneInfo.the, builder: (context, _) => const _Background()),
+              // the music card shows keys of its own from Android 13 on
+              if (PhoneInfo.the.android >= 33) const CardKeys(),
             ],
             const SectionTitle('Together'),
             SwitchListTile(
@@ -473,6 +476,78 @@ class _Background extends StatelessWidget {
         ),
     ]);
   }
+}
+
+/// The two keys the music card (lock screen, notification) shows next to play, picked in their order:
+/// a third one pushes out the one picked first.
+class CardKeys extends StatelessWidget {
+  const CardKeys({super.key});
+
+  static const _icons = {
+    'like': Icons.favorite_border_rounded,
+    'shuffle': Icons.shuffle_rounded,
+    'repeat': Icons.repeat_rounded,
+    'hide': Icons.do_not_disturb_on_outlined,
+    'sleep': Icons.bedtime_outlined,
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final set = App.settings;
+    return ListenableBuilder(
+      listenable: set,
+      builder: (context, _) {
+        final picked = set.cardKeys;
+        return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          ListTile(
+            leading: const Icon(Icons.lock_outline_rounded, color: Look.muted),
+            title: Text('Keys on the music card', style: Look.ui(15.5)),
+            subtitle: Text(
+                'Two more next to play, on the lock screen and in the notification. A podcast has 10 seconds '
+                'back and 30 ahead there instead.',
+                style: Look.ui(13, color: Look.muted, height: 1.35)),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: Wrap(spacing: 8, runSpacing: 8, children: [
+              for (final MapEntry(:key, :value) in cardKeyNames.entries)
+                ChoiceChip(
+                  avatar: picked.contains(key)
+                      ? _Place(picked.indexOf(key) + 1)
+                      : Icon(_icons[key], size: 18, color: Look.cream),
+                  label: Text(value),
+                  selected: picked.contains(key),
+                  showCheckmark: false,
+                  labelStyle:
+                      Look.ui(13.5, weight: FontWeight.w600, color: picked.contains(key) ? Look.bg : Look.cream),
+                  selectedColor: Look.cream,
+                  backgroundColor: Look.raised,
+                  side: BorderSide.none,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                  onSelected: (_) => set.toggleCardKey(key),
+                ),
+            ]),
+          ),
+        ]);
+      },
+    );
+  }
+}
+
+/// Where a picked key sits on the card: the first or the second.
+class _Place extends StatelessWidget {
+  const _Place(this.n);
+
+  final int n;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: 20,
+        height: 20,
+        alignment: Alignment.center,
+        decoration: const BoxDecoration(color: Look.bg, shape: BoxShape.circle),
+        child: Text('$n', style: Look.ui(11.5, weight: FontWeight.w800, color: Look.cream)),
+      );
 }
 
 class _Stock extends StatelessWidget {

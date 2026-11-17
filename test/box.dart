@@ -381,6 +381,10 @@ class Box {
     final audio = MixtapeAudio();
     await audio.ready;
     audio.unwanted = library.isHidden;
+    audio.isLiked = library.isLiked;
+    audio.toggleLike = library.toggleLike;
+    audio.hideSong = (t) => library.hide(t, true);
+    library.addListener(audio.refreshCard);
     App.audio = audio;
     App.library = library;
     App.account = account;

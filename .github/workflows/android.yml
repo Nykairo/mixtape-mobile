@@ -131,6 +131,13 @@ jobs:
           name: Mixtape-${{ steps.name.outputs.version }}
           path: Mixtape-*.apk
 
+      # started by hand on another branch: the APKs go into the draft "Test build" (see the script)
+      - name: Test build
+        if: github.event_name == 'workflow_dispatch' && github.ref != 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash .github/test-build.sh Mixtape-*.apk
+
       - name: Release
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:

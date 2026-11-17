@@ -1,6 +1,7 @@
 **New in 0.3.1**
 
 - A new icon: the same tape as Mixtape on the computer, on a dark tile. It comes in the wallpaper's colors too on Android 13 and newer, and in the dark and tinted looks on the iPhone.
+- The music card on the lock screen and in the notification has two more keys next to play on Android 13 and newer: the heart and shuffle to start with, or repeat, Not for me and Stop after this song, picked in Settings. A podcast has 10 seconds back and 30 ahead there instead, a tap on the card opens the big player, and the cover behind it is sharper.
 - Video mode no longer stops the song: on Android the video took the sound for itself, so the music paused over and over. Video mode also stays on now, and each song's video is looked up as the song starts (and the next one's while it plays), so it's there when the player opens.
 - Samples: the cover, the words and the keys don't sit on top of each other any more, the bar under a sample shows that sample (it used to show the one before when you flicked), and the cards flick above the tabs instead of under them. The next sample loads while you listen, and the ones after it are looked up ahead.
 - Skipping to the next song starts at once: its first seconds are read while the song before plays.

@@ -24,6 +24,9 @@ class PhoneInfo extends ChangeNotifier with WidgetsBindingObserver {
   /// Android Go or under 3 GB of memory.
   bool lowRam = false;
 
+  /// The Android version as its API level (33 is Android 13), 0 when it isn't known or not Android.
+  int android = 0;
+
   bool _watching = false;
 
   /// Makers whose battery managers are known to stop music in the background.
@@ -78,6 +81,8 @@ class PhoneInfo extends ChangeNotifier with WidgetsBindingObserver {
     model = '${p['model'] ?? ''}';
     batteryFree = p['batteryFree'] != false;
     lowRam = p['lowRam'] == true;
+    final level = p['android'];
+    if (level is int) android = level;
     notifyListeners();
   }
 

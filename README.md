@@ -70,7 +70,10 @@ With a free Apple ID the signature lasts seven days, and AltStore or SideStore r
   Ctrl+Left and Ctrl+Right jump, Ctrl+F searches, Ctrl+P opens the player, Ctrl+N makes a tape,
   Alt+Left goes back, Ctrl+E and Ctrl+I save or take in the library, Ctrl+Shift+L is Listen together.
 - Keeps playing with the screen off, with its keys in the notification, on the lock screen, on
-  headphones and on the widgets. Picks up where you left off.
+  headphones and on the widgets. Picks up where you left off. On Android 13 and newer the music card
+  has two more keys next to play, picked in Settings: the heart, shuffle, repeat, Not for me or Stop
+  after this song (a podcast has 10 seconds back and 30 ahead there). A tap on the card opens the big
+  player.
 
 Not on the phone: Cass, the DJ from the computer (it runs a language model on the computer itself),
 the song pop-up and the mini player window, which are the computer's own. Songs a tape got from
