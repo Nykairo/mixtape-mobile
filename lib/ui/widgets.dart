@@ -26,11 +26,11 @@ void say(BuildContext context, String text) {
   m?.showSnackBar(SnackBar(content: Text(text), duration: const Duration(seconds: 3)));
 }
 
-/// A song's link to send to someone: the phone's share sheet on Android, copied on the iPhone.
+/// A song's link to send to someone: the phone's share sheet, or copied where there's none.
 Future<void> shareSong(BuildContext context, Track t) async {
   final link = t.src == 'yt' ? 'https://music.youtube.com/watch?v=${t.ref}' : t.ref;
   final text = '${t.title}${t.artist.isEmpty ? '' : ' by ${t.artist}'}\n$link';
-  if (Platform.isAndroid && await MixtapeNative.share(text)) return;
+  if (await MixtapeNative.share(text)) return;
   await Clipboard.setData(ClipboardData(text: link));
   if (context.mounted) say(context, 'Link copied');
 }

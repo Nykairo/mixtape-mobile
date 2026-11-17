@@ -40,6 +40,16 @@ jobs:
       - name: Build (unsigned)
         run: flutter build ios --release --no-codesign
 
+      - name: Sign it for nobody in particular
+        # an unsigned app carries no entitlements: signed for nobody, it says it shares an App Group with
+        # its widgets, and AltStore, SideStore or Sideloadly keep that when they sign it with your Apple ID
+        run: |
+          app=build/ios/iphoneos/Runner.app
+          find "$app/Frameworks" -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' \) -exec codesign --force --sign - {} \;
+          codesign --force --sign - --entitlements ios-extras/widgets/MixtapeWidgets.entitlements "$app/PlugIns/MixtapeWidgets.appex"
+          codesign --force --sign - --entitlements ios-extras/Runner.entitlements "$app"
+          codesign -d --entitlements - "$app" 2>/dev/null | grep -A3 application-groups
+
       - name: Pack the IPA
         id: name
         run: |

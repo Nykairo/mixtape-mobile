@@ -57,8 +57,8 @@ class MixtapeNative {
     }
   }
 
-  /// Hands text (a song's link) to the phone's share sheet. False where there is none (the iPhone
-  /// copies it instead, see the app).
+  /// Hands text (a song's link) to the phone's share sheet. False where there is none (the app copies
+  /// it instead).
   static Future<bool> share(String text) async {
     try {
       await _channel.invokeMethod<void>('share', {'text': text});

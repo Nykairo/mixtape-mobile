@@ -1,7 +1,7 @@
 #!/bin/bash
 # The iPhone app's own settings, laid over the project `flutter create` makes (the ios/ folder isn't kept
 # in git): its name, music that keeps playing in the background and on the lock screen, plain http for
-# the player's local server and old podcasts, and the cassette icon.
+# the player's local server and old podcasts, the cassette icon, and the home screen widgets.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 P=ios/Runner/Info.plist
@@ -20,4 +20,8 @@ $B -c "Add :ITSAppUsesNonExemptEncryption bool false" "$P"
 # one 1024 picture each for the normal, the dark and the tinted home screen (iOS 18 and newer pick)
 rm -f ios/Runner/Assets.xcassets/AppIcon.appiconset/*
 cp ios-extras/AppIcon.appiconset/* ios/Runner/Assets.xcassets/AppIcon.appiconset/
-echo "iOS project set up: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$P"), background audio, icons"
+
+# the widgets: a WidgetKit extension next to the app (xcodeproj comes with CocoaPods)
+ruby -e "require 'xcodeproj'" 2>/dev/null || gem install --user-install --no-document xcodeproj
+ruby ios-extras/add_widgets.rb
+echo "iOS project set up: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleDisplayName' "$P"), background audio, icons, widgets"

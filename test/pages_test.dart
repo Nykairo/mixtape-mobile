@@ -279,9 +279,11 @@ void main() {
     expect(find.text('Crossfade'), findsOneWidget);
     await shot(tester, 'settings');
     // further down the list, past what's between songs and the lyrics
-    await tester.scrollUntilVisible(find.textContaining('5 songs'), 300, scrollable: find.byType(Scrollable).first);
-    await wait(tester);
+    final list = find.byType(Scrollable).first;
+    await tester.scrollUntilVisible(find.text('Friends can listen along'), 300, scrollable: list);
     expect(find.text('Friends can listen along'), findsOneWidget);
+    await tester.scrollUntilVisible(find.textContaining('5 songs'), 300, scrollable: list);
+    await wait(tester);
     expect(find.textContaining('5 songs'), findsOneWidget, reason: 'the songs saved on the phone are counted');
     await shot(tester, 'settings_further');
     await close(tester);
@@ -344,13 +346,15 @@ void main() {
     await wait(tester);
     expect(find.text('ASKED FOR'), findsOneWidget);
     expect(find.text('Take requests'), findsOneWidget);
-    expect(find.text('End the party'), findsOneWidget);
     t.reactions.add('heart');
     t.reactions.add('flame');
     await tester.pump(const Duration(milliseconds: 600));
     expect(find.byIcon(Icons.local_fire_department_rounded), findsWidgets);
     await shot(tester, 'together_party');
     await tester.pump(const Duration(seconds: 4)); // the reactions float away
+    // the end of the page: the host ends the party, a guest only leaves it
+    await tester.scrollUntilVisible(find.text('End the party'), 300, scrollable: find.byType(Scrollable).first);
+    expect(find.text('End the party'), findsOneWidget);
 
     t.room = null;
     t.state = rooms.blank();
