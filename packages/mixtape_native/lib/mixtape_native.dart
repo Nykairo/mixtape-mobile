@@ -1,5 +1,5 @@
-/// The parts of Mixtape that live on the Android side: YouTube Music through NewPipe's extractor, and
-/// the widgets on the home screen.
+/// The parts of Mixtape that live on the phone's own side: YouTube Music through NewPipe's extractor
+/// (Android), the share sheet, picking pictures, files and music, and the widgets on the home screen.
 library;
 
 import 'dart:async';
@@ -106,6 +106,30 @@ class MixtapeNative {
     }
   }
 
+  /// Music files picked from the phone, with what's written inside them: songs as the app keeps them
+  /// ({src: file, ref, title, artist, album, dur, art}). Empty when none were picked.
+  static Future<List<Map<String, Object?>>> pickMusic() async {
+    try {
+      return _maps(await _channel.invokeMethod<List<Object?>>('pickMusic'));
+    } on MissingPluginException {
+      return const [];
+    } on PlatformException {
+      return const [];
+    }
+  }
+
+  /// The music files Mixtape was opened with from a files app (Android's "Open with", or shared to it),
+  /// once, as [pickMusic] gives them. The widget taps say `files` when there are some.
+  static Future<List<Map<String, Object?>>> openedMusic() async {
+    try {
+      return _maps(await _channel.invokeMethod<List<Object?>>('openedMusic'));
+    } on MissingPluginException {
+      return const [];
+    } on PlatformException {
+      return const [];
+    }
+  }
+
   /// A picture picked from the phone, made into a profile picture: its middle square, 256 pixels, a
   /// JPEG in base64. Null when nothing was picked, or where there's no picker.
   static Future<String?> pickPicture() async {
@@ -192,7 +216,7 @@ class MixtapeNative {
   static bool _listening = false;
 
   /// What's tapped on a widget for the app to do: `like`, `shuffle`, or `tape:` and a tape's id (open that
-  /// tape and play it).
+  /// tape and play it). `files` says music files were opened with Mixtape (see [openedMusic]).
   static Stream<String> get widgetTaps {
     if (!_listening) {
       _listening = true;

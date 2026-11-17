@@ -1,10 +1,11 @@
 /// Adding music from elsewhere: a playlist from Spotify, YouTube, YouTube Music or Deezer (or a pasted
-/// list) made into a tape, and a podcast with its newest episodes. Library's + opens both, and a list's
-/// link pasted into the search box comes here by itself.
+/// list) made into a tape, a podcast with its newest episodes, and music files on the phone itself.
+/// Library's + opens them all, and a list's link pasted into the search box comes here by itself.
 library;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:mixtape_native/mixtape_native.dart';
 
 import '../app.dart';
 import '../importer.dart';
@@ -30,6 +31,7 @@ Future<void> addMusic(BuildContext context, {required VoidCallback newTape}) asy
           (0, Icons.add_rounded, 'New tape', 'Name it, then fill it with songs'),
           (1, Icons.playlist_add_rounded, 'Import a playlist', 'From Spotify, YouTube, YouTube Music or Deezer, or a list of songs'),
           (2, Icons.podcasts_rounded, 'Add a podcast', 'Find it by name, or paste its RSS link'),
+          (3, Icons.folder_open_rounded, 'Music on this phone', 'Play songs saved on the phone, from its files'),
         ])
           ListTile(
             leading: Icon(icon, color: Look.cream),
@@ -49,7 +51,20 @@ Future<void> addMusic(BuildContext context, {required VoidCallback newTape}) asy
       Shell.push(const ImportPage());
     case 2:
       Shell.push(const PodcastPage());
+    case 3:
+      await playPhoneFiles(await MixtapeNative.pickMusic());
   }
+}
+
+/// Music files from the phone, picked here or opened with Mixtape from a files app: they play right
+/// away. They stay off tapes and liked songs (see Track.fromPhone).
+Future<void> playPhoneFiles(List<Map<String, Object?>> files) async {
+  final songs = [
+    for (final m in files)
+      if (Track.fromJson(m) case final Track t when t.fromPhone) t,
+  ];
+  if (songs.isEmpty) return;
+  await App.audio.playSongs(songs, from: songs.length == 1 ? 'A file on this phone' : 'Files on this phone');
 }
 
 // ---------------------------------------------------------------- a playlist from elsewhere

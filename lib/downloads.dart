@@ -93,6 +93,11 @@ class Downloads extends ChangeNotifier {
 
   /// The saved cover of a song, for showing it offline.
   File? coverOf(Track t) {
+    if (t.fromPhone) {
+      // a phone file's own cover, read out of it when it was opened
+      final art = t.art.startsWith('/') ? File(t.art) : null;
+      return art != null && art.existsSync() ? art : null;
+    }
     if (!_saved.containsKey(t.id)) return null;
     final f = File('${_dir.path}/${t.id}.jpg');
     return f.existsSync() ? f : null;

@@ -1,7 +1,9 @@
 // The parts of Mixtape that live on the iPhone side: the share sheet, picking a picture (a profile
-// picture, or a photo to stick on a tape), and what the home screen widgets show. The widgets read it
-// from the App Group the app shares with them (ios-extras/widgets); their keys come back here.
+// picture, or a photo to stick on a tape), a file or music from the phone, and what the home screen
+// widgets show. The widgets read it from the App Group the app shares with them (ios-extras/widgets);
+// their keys come back here.
 
+import AVFoundation
 import Flutter
 import PhotosUI
 import SwiftUI // Xcode 26 loses the photo picker's types next to WidgetKit unless SwiftUI is here too
@@ -56,6 +58,10 @@ public class MixtapeNativePlugin: NSObject, FlutterPlugin {
       result(share([URL(fileURLWithPath: path)]))
     case "pickFile":
       pickFile(result)
+    case "pickMusic":
+      pickMusic(result)
+    case "openedMusic":
+      result([Any]()) // nothing opens a file with Mixtape on the iPhone yet: Add music picks them
     case "pickPicture":
       pick(args["for"] as? String ?? "profile", result)
     case "widget":
@@ -134,9 +140,25 @@ public class MixtapeNativePlugin: NSObject, FlutterPlugin {
     }
     picking?(nil)
     picking = result
+    pickingFor = "file"
     let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.json, .plainText, .data], asCopy: true)
     picker.delegate = self
     picker.allowsMultipleSelection = false
+    top.present(picker, animated: true)
+  }
+
+  /// Songs from the phone's Files, copied where the app can play them: [] when none were picked.
+  private func pickMusic(_ result: @escaping FlutterResult) {
+    guard #available(iOS 14, *), let top = topController() else {
+      result([Any]())
+      return
+    }
+    picking?(nil)
+    picking = result
+    pickingFor = "music"
+    let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.audio], asCopy: true)
+    picker.delegate = self
+    picker.allowsMultipleSelection = true
     top.present(picker, animated: true)
   }
 
@@ -223,6 +245,16 @@ extension MixtapeNativePlugin: UIDocumentPickerDelegate {
   public func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
     guard let answer = picking else { return }
     picking = nil
+    if pickingFor == "music" {
+      let picked = Array(urls.prefix(300))
+      DispatchQueue.global(qos: .userInitiated).async {
+        let songs = PhoneMusic.read(picked)
+        DispatchQueue.main.async {
+          answer(songs)
+        }
+      }
+      return
+    }
     guard let from = urls.first else {
       answer(nil)
       return
@@ -240,8 +272,73 @@ extension MixtapeNativePlugin: UIDocumentPickerDelegate {
   }
 
   public func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
-    picking?(nil)
+    picking?(pickingFor == "music" ? [Any]() : nil)
     picking = nil
+  }
+}
+
+/// Music files picked on the phone: what's written inside each one (title, artist, album, length and
+/// its cover), the way the computer reads a music folder. They play from the copies the picker made.
+enum PhoneMusic {
+  static func read(_ urls: [URL]) -> [[String: Any]] {
+    tidy()
+    return urls.map { song($0) }
+  }
+
+  private static func song(_ url: URL) -> [String: Any] {
+    let name = url.deletingPathExtension().lastPathComponent.replacingOccurrences(of: "_", with: " ")
+    var found: [String: Any] = ["src": "file", "ref": url.path, "title": name.isEmpty ? "Untitled" : name]
+    let asset = AVURLAsset(url: url)
+    let seconds = CMTimeGetSeconds(asset.duration)
+    if seconds.isFinite && seconds > 0 {
+      found["dur"] = Int(seconds)
+    }
+    let tags = asset.commonMetadata
+    func text(_ key: AVMetadataKey) -> String? {
+      let value = AVMetadataItem.metadataItems(from: tags, withKey: key, keySpace: .common).first?.stringValue
+      let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+      return trimmed.isEmpty ? nil : trimmed
+    }
+    if let title = text(.commonKeyTitle) { found["title"] = title }
+    if let artist = text(.commonKeyArtist) { found["artist"] = artist }
+    if let album = text(.commonKeyAlbumName) { found["album"] = album }
+    if let data = AVMetadataItem.metadataItems(from: tags, withKey: AVMetadataKey.commonKeyArtwork, keySpace: .common).first?.dataValue,
+       let art = cover(data) {
+      found["art"] = art
+    }
+    return found
+  }
+
+  /// The cover as a small JPEG next to the app's other covers: its path, or nil.
+  private static func cover(_ data: Data) -> String? {
+    guard let image = UIImage(data: data), image.size.width >= 1, image.size.height >= 1 else { return nil }
+    let folder = FileManager.default.temporaryDirectory.appendingPathComponent("phone-covers")
+    try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+    let file = folder.appendingPathComponent("\(UUID().uuidString).jpg")
+    let k = min(1, 544 / max(image.size.width, image.size.height))
+    let size = CGSize(width: max(1, (image.size.width * k).rounded()), height: max(1, (image.size.height * k).rounded()))
+    let format = UIGraphicsImageRendererFormat()
+    format.scale = 1
+    format.opaque = true
+    let small = UIGraphicsImageRenderer(size: size, format: format).image { _ in
+      image.draw(in: CGRect(origin: .zero, size: size))
+    }
+    guard let jpeg = small.jpegData(compressionQuality: 0.86), (try? jpeg.write(to: file, options: .atomic)) != nil else { return nil }
+    return file.path
+  }
+
+  /// Covers and copies from more than a day ago go: the songs they were for left the queue long since.
+  private static func tidy() {
+    let fm = FileManager.default
+    let old = Date().addingTimeInterval(-86_400)
+    let inbox = fm.temporaryDirectory.appendingPathComponent("\(Bundle.main.bundleIdentifier ?? "mixtape")-Inbox")
+    for folder in [fm.temporaryDirectory.appendingPathComponent("phone-covers"), inbox] {
+      let files = (try? fm.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+      for f in files {
+        let when = (try? f.resourceValues(forKeys: [.contentModificationDateKey]))?.contentModificationDate ?? Date()
+        if when < old { try? fm.removeItem(at: f) }
+      }
+    }
   }
 }
 

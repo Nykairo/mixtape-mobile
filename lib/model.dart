@@ -32,7 +32,11 @@ class Track {
 
   String get id => '$src$ref';
 
-  bool get playable => src == 'yt' || (src == 'pod' && ref.startsWith('http'));
+  bool get playable => src == 'yt' || (src == 'pod' && ref.startsWith('http')) || fromPhone;
+
+  /// A music file on this phone, opened from its files: it plays here only, so it stays off tapes, liked
+  /// songs and everything shared.
+  bool get fromPhone => src == 'file';
 
   String get album => '${extra['album'] ?? ''}';
 

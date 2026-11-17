@@ -22,6 +22,11 @@ import 'widgets.dart';
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
 
+  static final _asked = ValueNotifier<int>(0);
+
+  /// The search field, ready to type in (Ctrl+F on a keyboard).
+  static void typeIn() => _asked.value++;
+
   @override
   State<SearchPage> createState() => _SearchPageState();
 }
@@ -40,13 +45,22 @@ class _SearchPageState extends State<SearchPage> {
     super.initState();
     _focus.addListener(() => setState(() {}));
     _field.addListener(_typed);
+    SearchPage._asked.addListener(_typeIn);
     Music.moods().then((m) {
       if (mounted) setState(() => _moods = m);
     }).catchError((Object _) {});
   }
 
+  void _typeIn() {
+    // the tab comes up in this frame: the field takes the keys once it shows
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _focus.requestFocus();
+    });
+  }
+
   @override
   void dispose() {
+    SearchPage._asked.removeListener(_typeIn);
     _typing?.cancel();
     _field.dispose();
     _focus.dispose();

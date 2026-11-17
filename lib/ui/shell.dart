@@ -332,6 +332,7 @@ class _Heart extends StatelessWidget {
     return ListenableBuilder(
       listenable: App.library,
       builder: (context, _) {
+        if (track.fromPhone) return const OnThisPhone();
         final liked = App.library.isLiked(track);
         return IconButton(
           tooltip: liked ? 'Unlike' : 'Like',

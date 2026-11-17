@@ -129,6 +129,12 @@ Color _lighter(Color c, double f) {
 
 bool _light(Color c) => (0.299 * c.r + 0.587 * c.g + 0.114 * c.b) > 0.58;
 
+/// A song's cover to draw: a phone file's own is in a file here, every other one on the internet.
+ImageProvider<Object> coverImage(String where) {
+  if (where.startsWith('/')) return FileImage(File(where));
+  return NetworkImage(where);
+}
+
 /// What a tape looks like: the label paper, its ink and pen, the shell and its parts.
 class TapeLook {
   TapeLook({required this.slot, Map<String, Object?>? design}) : d = design ?? const {} {
@@ -848,10 +854,13 @@ class _CassetteState extends State<Cassette> with SingleTickerProviderStateMixin
               rect: spot.deflate(2.2),
               child: Transform.rotate(
                 angle: -4 * pi / 180,
-                child: Image.network(
-                  widget.cover,
+                child: Image(
+                  image: ResizeImage.resizeIfNeeded(
+                    (spot.width * MediaQuery.devicePixelRatioOf(context)).round().clamp(32, 512),
+                    null,
+                    coverImage(widget.cover),
+                  ),
                   fit: BoxFit.cover,
-                  cacheWidth: (spot.width * MediaQuery.devicePixelRatioOf(context)).round().clamp(32, 512),
                   errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                   gaplessPlayback: true,
                 ),
