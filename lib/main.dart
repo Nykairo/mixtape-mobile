@@ -22,6 +22,7 @@ import 'store.dart';
 import 'together.dart';
 import 'ui/keys.dart';
 import 'ui/shell.dart';
+import 'video.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -67,6 +68,9 @@ Future<void> main() async {
   audio.onPlayed = (t) {
     library.played(t);
     scrobbler.playingNow(t, pos: audio.player.position.inMilliseconds / 1000);
+    // video mode: this song's video (and the next one's) is looked up as the song starts, so the player
+    // has it at once, open or not
+    if (settings.playerView == 'video') Videos.prepare([t, if (audio.upNext case final next?) next]).ignore();
   };
   audio.onHeard = (t, seconds, started) {
     history.heard(t, seconds, started);

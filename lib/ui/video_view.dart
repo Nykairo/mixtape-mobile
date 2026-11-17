@@ -1,9 +1,10 @@
 /// Video mode on the big player: the song's music video, without sound, following the song (it starts,
 /// pauses, jumps and changes speed with it). It only runs while it shows: off screen, or with the app in
-/// the background, it lets go.
+/// the background, it lets go. The video of the song after this one is looked up while this one plays.
 library;
 
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
@@ -65,6 +66,7 @@ class _VideoViewState extends State<VideoView> with WidgetsBindingObserver {
       if (!mounted || ask != _asked) return;
       if (v == null) {
         setState(() => _state = 'none');
+        _readyNext();
         return;
       }
       final (url, agent) = await Videos.stream(v.id);
@@ -73,7 +75,14 @@ class _VideoViewState extends State<VideoView> with WidgetsBindingObserver {
         setState(() => _state = 'failed');
         return;
       }
-      final c = VideoPlayerController.networkUrl(Uri.parse(url), httpHeaders: {if (agent.isNotEmpty) 'User-Agent': agent});
+      final c = VideoPlayerController.networkUrl(
+        Uri.parse(url),
+        httpHeaders: {if (agent.isNotEmpty) 'User-Agent': agent},
+        // Android hands the sound to whoever plays last: a video that asks for it pauses the song, and
+        // the song back on pauses the video, over and over. The video has no sound here, so it never
+        // asks. (On the iPhone the song and its video share one audio session and get along as they are.)
+        videoPlayerOptions: Platform.isAndroid ? VideoPlayerOptions(mixWithOthers: true) : null,
+      );
       await c.initialize();
       if (!mounted || ask != _asked) {
         await c.dispose();
@@ -84,9 +93,16 @@ class _VideoViewState extends State<VideoView> with WidgetsBindingObserver {
       _c = c;
       setState(() => _state = 'on');
       _startFollowing();
+      _readyNext();
     } on Object {
       if (mounted && ask == _asked) setState(() => _state = 'failed');
     }
+  }
+
+  /// The next song's video, looked up now so it shows the moment that song starts.
+  void _readyNext() {
+    final next = App.audio.upNext;
+    if (next != null) Videos.prepare([next]).ignore();
   }
 
   void _startFollowing() {

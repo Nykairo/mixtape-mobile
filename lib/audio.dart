@@ -98,6 +98,49 @@ class Links {
   static int _int(Object? v) => v is int ? v : (v is num ? v.toInt() : int.tryParse('${v ?? ''}') ?? -1);
 }
 
+/// The first seconds of the song that comes next, read while this one plays, so that skipping to it
+/// starts the moment the key is pressed (the computer does the same). Two songs at most, a few hundred
+/// kilobytes each; YouTubeSource sends them out first and goes on from YouTube after them.
+class Heads {
+  static const size = 384 << 10; // about twenty seconds of music
+  static final _kept = <String, ({Uint8List bytes, int length, String mime})>{};
+  static final _reading = <String, Future<void>>{};
+
+  /// A song's first bytes, when they're here and from the same file the address leads to.
+  static Uint8List? of(String id, Link link) {
+    final h = _kept[id];
+    return h != null && h.length == link.length && h.mime == link.mime ? h.bytes : null;
+  }
+
+  /// Reads the start of a song into memory, quietly. Once per song.
+  static Future<void> read(Track t, http.Client client) {
+    if (t.src != 'yt' || _kept.containsKey(t.ref)) return Future.value();
+    return _reading[t.ref] ??= _read(t.ref, client).whenComplete(() => _reading.remove(t.ref));
+  }
+
+  static Future<void> _read(String id, http.Client client) async {
+    try {
+      final link = await Links.get(id);
+      if (link.length <= 0) return; // a size it didn't say: no telling the file is the same later
+      final req = http.Request('GET', link.url)
+        ..headers['Range'] = 'bytes=0-${min(link.length, size) - 1}'
+        ..headers['User-Agent'] = link.agent;
+      final res = await client.send(req).timeout(const Duration(seconds: 15));
+      if (res.statusCode != 206) {
+        await res.stream.drain<void>().catchError((Object _) {});
+        return;
+      }
+      final bytes = await res.stream.toBytes().timeout(const Duration(seconds: 30));
+      _kept[id] = (bytes: bytes, length: link.length, mime: link.mime);
+      while (_kept.length > 2) {
+        _kept.remove(_kept.keys.first);
+      }
+    } on Object {
+      // then it starts the usual way, from YouTube
+    }
+  }
+}
+
 /// A YouTube song's bytes for the player, through just_audio's little server on the phone itself.
 /// It asks YouTube for a piece at a time; a piece that breaks off is asked for again from where it
 /// broke, and an address YouTube stopped taking is looked up again, so the player never notices.
@@ -158,6 +201,13 @@ class YouTubeSource extends StreamAudioSource {
     var refused = 0;
     var broken = 0;
     final clock = Stopwatch()..start();
+    // the start read ahead (Heads) goes out at once; YouTube carries on after it
+    final head = Heads.of(track.ref, await Links.get(track.ref));
+    if (head != null && at < head.length) {
+      final end = min(to, head.length);
+      yield Uint8List.sublistView(head, at, end);
+      at = end;
+    }
     while (at < to) {
       final link = await Links.get(track.ref, fresh: refused > 0);
       // three times as fast as it plays is plenty to stay ahead, and keeps the phone's memory free
@@ -537,7 +587,14 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
     }
     final view = this.view;
     if (view.index + 1 < view.songs.length) {
-      Links.warm(view.songs[view.index + 1]); // the next one's address, ready when it's its turn
+      final next = view.songs[view.index + 1];
+      Links.warm(next); // the next one's address, ready when it's its turn
+      // and, once this one plays, its first seconds: skipping to it starts at once
+      if (Downloads.the.fileOf(next) == null) {
+        Timer(const Duration(seconds: 4), () {
+          if (current?.id == t.id && _player.playing) Heads.read(next, _client).ignore();
+        });
+      }
     } else {
       _keepGoing(t);
     }
@@ -911,7 +968,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   }
 
   /// The song after this one, in the order the queue plays.
-  Track? get _upNext {
+  Track? get upNext {
     final v = view;
     return v.index >= 0 && v.index + 1 < v.songs.length ? v.songs[v.index + 1] : null;
   }
@@ -922,7 +979,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
     if (crossfade == Duration.zero || _blend != null || !_player.playing || steer != null || sleepAtEnd) return;
     final total = _player.duration;
     final t = current;
-    final next = _upNext;
+    final next = upNext;
     if (total == null || t == null || next == null || _player.loopMode == LoopMode.one) return;
     if (total < crossfade * 3 || (albumsWhole && t.album.isNotEmpty && t.album == next.album && t.artist == next.artist)) {
       return; // a short song, or the next one is the album's next: one after the other, as made

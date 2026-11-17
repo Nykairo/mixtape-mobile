@@ -86,17 +86,26 @@ class _SamplesPageState extends State<SamplesPage> {
             ),
           );
         }
+        // the cards flick above the tabs, never under them
+        final tabs = MediaQuery.paddingOf(context).bottom;
         return Scaffold(
           backgroundColor: Colors.black,
           body: Stack(children: [
-            PageView.builder(
-              controller: _pages,
-              scrollDirection: Axis.vertical,
-              itemCount: feed.items.length,
-              onPageChanged: (k) {
-                if (_shown) feed.show(k);
-              },
-              itemBuilder: (context, k) => _SampleCard(sample: feed.items[k], feed: feed, here: k == feed.index),
+            Positioned.fill(
+              bottom: tabs,
+              child: MediaQuery.removePadding(
+                context: context,
+                removeBottom: true,
+                child: PageView.builder(
+                  controller: _pages,
+                  scrollDirection: Axis.vertical,
+                  itemCount: feed.items.length,
+                  onPageChanged: (k) {
+                    if (_shown) feed.show(k);
+                  },
+                  itemBuilder: (context, k) => _SampleCard(sample: feed.items[k], feed: feed, here: k == feed.index),
+                ),
+              ),
             ),
             SafeArea(
               child: Padding(
@@ -228,7 +237,7 @@ class _SampleCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final t = sample.track;
     final size = MediaQuery.sizeOf(context);
-    final side = min(size.width * 0.78, size.height * 0.46);
+    final pad = MediaQuery.paddingOf(context);
     return GestureDetector(
       onTap: feed.toggle,
       onDoubleTap: () {
@@ -246,69 +255,76 @@ class _SampleCard extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Color(0x66000000), Color(0x22000000), Color(0xDD000000)],
-              stops: [0, 0.45, 1],
+              colors: [Color(0x66000000), Color(0x22000000), Color(0xCC000000), Color(0xFF000000)],
+              stops: [0, 0.4, 0.82, 1],
             ),
           ),
         ),
-        Align(
-          alignment: const Alignment(0, -0.28),
-          child: AnimatedScale(
-            scale: here && !feed.paused ? 1 : 0.92,
-            duration: const Duration(milliseconds: 400),
-            curve: Curves.easeOutBack,
-            child: DecoratedBox(
-              decoration: const BoxDecoration(boxShadow: [BoxShadow(color: Colors.black87, blurRadius: 40, offset: Offset(0, 18))]),
-              child: Cover(t, size: side, radius: 14),
-            ),
-          ),
-        ),
-        if (here && feed.paused)
-          const Align(
-            alignment: Alignment(0, -0.28),
-            child: Icon(Icons.play_arrow_rounded, size: 84, color: Colors.white70),
-          ),
-        Positioned(
-          left: 20,
-          right: 84,
-          bottom: MediaQuery.paddingOf(context).bottom + 28,
+        // top to bottom, nothing on top of anything: the cover gets the room the words and keys leave
+        Padding(
+          padding: EdgeInsets.fromLTRB(22, pad.top + 62, 22, pad.bottom + 12),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Expanded(
+              child: LayoutBuilder(builder: (context, room) {
+                final side = min(room.maxWidth, room.maxHeight);
+                return Center(
+                  child: AnimatedScale(
+                    scale: here && !feed.paused ? 1 : 0.92,
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeOutBack,
+                    child: DecoratedBox(
+                      decoration: const BoxDecoration(
+                        boxShadow: [BoxShadow(color: Colors.black87, blurRadius: 40, offset: Offset(0, 18))],
+                      ),
+                      child: Stack(alignment: Alignment.center, children: [
+                        Cover(t, size: side, radius: 14),
+                        if (here && feed.paused) const Icon(Icons.play_arrow_rounded, size: 84, color: Colors.white70),
+                      ]),
+                    ),
+                  ),
+                );
+              }),
+            ),
+            const SizedBox(height: 20),
             Text(t.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: Look.ui(24, weight: FontWeight.w900, height: 1.15)),
             const SizedBox(height: 4),
             Text(t.artist, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(16, color: Look.cream.withValues(alpha: 0.8))),
             const SizedBox(height: 14),
-            if (here) _ClipProgress(feed: feed, sample: sample),
-          ]),
-        ),
-        Positioned(
-          right: 12,
-          bottom: MediaQuery.paddingOf(context).bottom + 24,
-          child: Column(children: [
-            ListenableBuilder(
-              listenable: App.library,
-              builder: (context, _) {
-                final liked = App.library.isLiked(t);
-                return _Side(liked ? Icons.favorite_rounded : Icons.favorite_border_rounded, liked ? 'Liked' : 'Like',
-                    () => App.library.toggleLike(t),
-                    color: liked ? Look.accent : null);
-              },
-            ),
-            _Side(Icons.library_add_rounded, 'Tape', () => pickTape(context, [t])),
-            _Side(Icons.play_circle_fill_rounded, 'Play it', () async {
-              await feed.stop();
-              await App.audio.playSongs([t], from: 'Samples');
-              final away = leave;
-              if (away != null) {
-                away();
-              } else {
-                Shell.goTo(0);
-              }
-            }),
-            _Side(Icons.ios_share_rounded, 'Share', () => shareSong(context, t)),
-            _Side(Icons.do_not_disturb_on_outlined, 'Not for me', () {
-              App.library.hide(t, true);
-              say(context, "Got it. Songs like that come up less, and this one doesn't anymore.");
-            }),
+            if (here) _ClipProgress(feed: feed) else const SizedBox(height: 3),
+            const SizedBox(height: 12),
+            Row(children: [
+              Expanded(
+                child: ListenableBuilder(
+                  listenable: App.library,
+                  builder: (context, _) {
+                    final liked = App.library.isLiked(t);
+                    return _Key(liked ? Icons.favorite_rounded : Icons.favorite_border_rounded, liked ? 'Liked' : 'Like',
+                        () => App.library.toggleLike(t),
+                        color: liked ? Look.accent : null);
+                  },
+                ),
+              ),
+              Expanded(child: _Key(Icons.library_add_rounded, 'Tape', () => pickTape(context, [t]))),
+              Expanded(
+                child: _Key(Icons.play_circle_fill_rounded, 'Play it', () async {
+                  await feed.stop();
+                  await App.audio.playSongs([t], from: 'Samples');
+                  final away = leave;
+                  if (away != null) {
+                    away();
+                  } else {
+                    Shell.goTo(0);
+                  }
+                }),
+              ),
+              Expanded(child: _Key(Icons.ios_share_rounded, 'Share', () => shareSong(context, t))),
+              Expanded(
+                child: _Key(Icons.do_not_disturb_on_outlined, 'Not for me', () {
+                  App.library.hide(t, true);
+                  say(context, "Got it. Songs like that come up less, and this one doesn't anymore.");
+                }),
+              ),
+            ]),
           ]),
         ),
       ]),
@@ -316,8 +332,9 @@ class _SampleCard extends StatelessWidget {
   }
 }
 
-class _Side extends StatelessWidget {
-  const _Side(this.icon, this.text, this.onTap, {this.color});
+/// One of the keys in the row under a sample: a big icon with its word.
+class _Key extends StatelessWidget {
+  const _Key(this.icon, this.text, this.onTap, {this.color});
 
   final IconData icon;
   final String text;
@@ -326,46 +343,39 @@ class _Side extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 14),
-      child: InkResponse(
-        onTap: onTap,
-        radius: 30,
-        child: Column(children: [
-          Icon(icon, size: 34, color: color ?? Colors.white, shadows: const [Shadow(color: Colors.black54, blurRadius: 12)]),
-          const SizedBox(height: 3),
-          Text(text, style: Look.ui(11.5, weight: FontWeight.w700, color: Colors.white)),
+    return InkResponse(
+      onTap: onTap,
+      radius: 32,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 30, color: color ?? Colors.white, shadows: const [Shadow(color: Colors.black54, blurRadius: 12)]),
+          const SizedBox(height: 4),
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(text, maxLines: 1, style: Look.ui(11.5, weight: FontWeight.w700, color: Colors.white)),
+          ),
         ]),
       ),
     );
   }
 }
 
-/// How far into its half minute the sample is.
+/// How far into its half minute the sample is: the sample that plays says so itself (Samples.progress),
+/// whichever of its two players has it.
 class _ClipProgress extends StatelessWidget {
-  const _ClipProgress({required this.feed, required this.sample});
+  const _ClipProgress({required this.feed});
 
   final Samples feed;
-  final Sample sample;
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<Duration>(
-      stream: feed.player.positionStream,
-      builder: (context, snap) {
-        final start = (sample.start ?? 0) * 1000;
-        final at = (snap.data ?? Duration.zero).inMilliseconds - start;
-        final f = (at / (Samples.length * 1000)).clamp(0.0, 1.0);
-        return ClipRRect(
-          borderRadius: BorderRadius.circular(2),
-          child: LinearProgressIndicator(
-            value: f,
-            minHeight: 3,
-            backgroundColor: Colors.white24,
-            color: Look.cream,
-          ),
-        );
-      },
+    return ValueListenableBuilder<double>(
+      valueListenable: feed.progress,
+      builder: (context, f, _) => ClipRRect(
+        borderRadius: BorderRadius.circular(2),
+        child: LinearProgressIndicator(value: f, minHeight: 3, backgroundColor: Colors.white24, color: Look.cream),
+      ),
     );
   }
 }

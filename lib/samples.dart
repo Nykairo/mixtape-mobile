@@ -2,7 +2,8 @@
 /// flicked through one after another like on TikTok. The computer's Samples page, for the phone.
 ///
 /// Samples has its own two players: one plays, the other has the next song loaded already, so a flick
-/// starts it at once. The music that was on waits, and carries on when you leave Samples.
+/// starts it at once; the best parts and addresses of the few after that are looked up meanwhile. The
+/// music that was on waits, and carries on when you leave Samples.
 library;
 
 import 'dart:async';
@@ -76,11 +77,15 @@ class Samples extends ChangeNotifier {
 
   final _client = http.Client();
   final _players = [AudioPlayer(useProxyForRequestHeaders: false), AudioPlayer(useProxyForRequestHeaders: false)];
-  final _loaded = <String?>[null, null];
+  final _loaded = <String?>[null, null]; // the song each player has (or is getting)
+  final _loading = <Future<void>?>[null, null];
   int _on = 0; // which player plays
   int index = -1; // the sample that plays
   bool paused = false;
   StreamSubscription<Duration>? _loop;
+
+  /// How far into its half minute the sample that plays is (0 to 1).
+  final progress = ValueNotifier<double>(0);
 
   AudioPlayer get player => _players[_on];
 
@@ -157,42 +162,58 @@ class Samples extends ChangeNotifier {
     return s.start = bestPart(heat, s.track.dur.toDouble(), length: length);
   }
 
-  Future<void> _load(int player, Sample s) async {
-    final at = await _startOf(s);
+  /// Gives a player a sample, from its best part. Said at once (so a flick meanwhile knows it's on its
+  /// way), done when the song is loaded; asked again for the same song, it's the same wait.
+  Future<void> _load(int player, Sample s) {
+    if (_loaded[player] == s.track.id) return _loading[player] ?? Future.value();
     _loaded[player] = s.track.id;
+    return _loading[player] = _put(player, s);
+  }
+
+  Future<void> _put(int player, Sample s) async {
+    final at = await _startOf(s);
+    if (_loaded[player] != s.track.id) return; // it got another song meanwhile
     try {
       await _players[player].setAudioSource(YouTubeSource(s.track, _client),
           initialPosition: Duration(milliseconds: (at * 1000).round()), preload: true);
     } on Object {
-      _loaded[player] = null;
+      if (_loaded[player] == s.track.id) _loaded[player] = null;
     }
   }
 
-  /// Plays the sample at [k] (from its best part, round and round), with the next one loading meanwhile.
+  /// Plays the sample at [k] (from its best part, round and round). The next one loads in the other
+  /// player meanwhile, and the few after it are looked up.
   Future<void> show(int k) async {
     if (k < 0 || k >= items.length) return;
+    final s = items[k];
+    final before = player;
     index = k;
     paused = false;
+    progress.value = 0;
+    if (_loaded[1 - _on] == s.track.id) _on = 1 - _on; // loaded ahead (or on its way): it takes over
     notifyListeners();
-    final s = items[k];
-    final other = 1 - _on;
-    await player.pause();
-    if (_loaded[other] == s.track.id) {
-      _on = other;
-    } else if (_loaded[_on] != s.track.id) {
-      await _load(_on, s);
-    }
+    await _loop?.cancel();
+    _loop = null;
+    await before.pause();
+    await _load(_on, s); // nothing to wait for when it's loaded already
     if (index != k) return; // flicked on meanwhile
+    final p = player;
     final start = Duration(milliseconds: ((s.start ?? 0) * 1000).round());
     final end = start + const Duration(seconds: 30);
-    await _loop?.cancel();
-    _loop = player.positionStream.listen((pos) {
-      if (pos >= end) player.seek(start).ignore();
+    _loop = p.positionStream.listen((pos) {
+      if (pos >= end) p.seek(start).ignore();
+      progress.value = ((pos - start).inMilliseconds / (length * 1000)).clamp(0.0, 1.0);
     });
-    await player.seek(start);
-    unawaited(player.play().catchError((Object _) {}));
+    // a player that loaded ahead waits at the start already; one that played it before goes back
+    if ((p.position - start).abs() > const Duration(milliseconds: 400)) await p.seek(start);
+    if (index != k) return;
+    unawaited(p.play().catchError((Object _) {}));
     if (k + 1 >= items.length - 3) unawaited(more());
     if (k + 1 < items.length) unawaited(_load(1 - _on, items[k + 1]));
+    for (final later in items.skip(k + 2).take(3)) {
+      _startOf(later).ignore();
+      Links.warm(later.track);
+    }
   }
 
   void toggle() {
@@ -211,15 +232,18 @@ class Samples extends ChangeNotifier {
     await _loop?.cancel();
     _loop = null;
     for (var k = 0; k < 2; k++) {
-      await _players[k].stop();
       _loaded[k] = null;
+      _loading[k] = null;
+      await _players[k].stop();
     }
     paused = true;
+    progress.value = 0;
   }
 
   @override
   void dispose() {
     _loop?.cancel();
+    progress.dispose();
     for (final p in _players) {
       p.dispose();
     }

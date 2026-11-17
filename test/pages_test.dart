@@ -29,6 +29,7 @@ import 'package:mixtape/ui/stats_page.dart';
 import 'package:mixtape/ui/studio.dart';
 import 'package:mixtape/ui/tape_page.dart';
 import 'package:mixtape/ui/together_page.dart';
+import 'package:mixtape/ui/video_view.dart';
 import 'package:mixtape/ui/widgets.dart';
 
 import 'box.dart';
@@ -618,7 +619,7 @@ void main() {
     expect(find.text(Box.songs.first.title), findsWidgets);
     await shot(tester, 'home_playing');
 
-    NowPlaying.view = 'cover';
+    App.settings.setPlayerView('cover');
     unawaited(NowPlaying.open(inside(tester)));
     await wait(tester);
     expect(find.text('PLAYING FROM  ROAD TRIP'), findsOneWidget);
@@ -628,8 +629,16 @@ void main() {
     await tester.tap(find.text('Tape').first);
     await wait(tester);
     await shot(tester, 'player_tape');
+    // video mode stays on (a setting), and a song without a video it can show keeps the music going
+    await tester.tap(find.text('Video'));
+    await wait(tester);
+    expect(App.settings.playerView, 'video');
+    expect(find.byType(VideoView), findsOneWidget);
+    expect(App.audio.player.playing, isTrue);
+    await shot(tester, 'player_video');
     await tester.tap(find.text('Song'));
     await wait(tester);
+    expect(App.settings.playerView, 'cover');
 
     await tester.tap(find.text('UP NEXT'));
     await wait(tester);
@@ -647,7 +656,7 @@ void main() {
   testWidgets('The big player fits a small phone, and big letters', (tester) async {
     await pumpApp(tester, size: const Size(360, 640));
     await Box.startMusic(tester);
-    NowPlaying.view = 'cover';
+    App.settings.setPlayerView('cover');
     unawaited(NowPlaying.open(inside(tester)));
     await wait(tester);
     expect(tester.takeException(), isNull);

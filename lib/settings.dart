@@ -1,7 +1,8 @@
 /// What can be set on the phone: the tape stock (the color of what plays), whether the music goes on
 /// with songs like the last one when a list runs out (the radio), the crossfade between songs, the
-/// lyrics' countdown, whether friends can listen along, how the library shows, and whether the word
-/// about the phone's battery manager was answered.
+/// lyrics' countdown, whether friends can listen along, what the big player shows (cover, tape or the
+/// music video), how the library shows, and whether the word about the phone's battery manager was
+/// answered.
 library;
 
 import 'package:flutter/foundation.dart';
@@ -11,6 +12,7 @@ import 'look.dart';
 import 'store.dart';
 
 const _file = 'settings.json';
+const _views = {'cover', 'tape', 'video'};
 
 class Settings extends ChangeNotifier {
   String get stock => Look.stock;
@@ -40,6 +42,10 @@ class Settings extends ChangeNotifier {
   bool rewindNote = true;
   String rewindSeen = '';
 
+  /// What the big player shows at the top: the song's 'cover', its 'tape', or its music 'video'. Video
+  /// mode stays on from one song (and one start of the app) to the next.
+  String playerView = 'cover';
+
   /// The library as a grid of cassettes (or a list), and how it's sorted: 'recent', 'name' or 'songs'.
   bool grid = false;
   String sort = 'recent';
@@ -61,6 +67,7 @@ class Settings extends ChangeNotifier {
         'listenbrainz_user': listenBrainzUser,
         'lastfm_key': lastFmKey,
         'rewind_seen': rewindSeen,
+        'player_view': playerView,
         'grid': grid,
         'sort': sort,
         'background_tip_done': backgroundTipDone,
@@ -84,6 +91,8 @@ class Settings extends ChangeNotifier {
       listenBrainzUser = '${j['listenbrainz_user'] ?? ''}';
       lastFmKey = '${j['lastfm_key'] ?? ''}';
       rewindSeen = '${j['rewind_seen'] ?? ''}';
+      final view = j['player_view'];
+      if (view is String && _views.contains(view)) playerView = view;
       grid = j['grid'] == true;
       final order = j['sort'];
       if (order is String && const {'recent', 'name', 'songs'}.contains(order)) sort = order;
@@ -113,6 +122,13 @@ class Settings extends ChangeNotifier {
     }
     if (shape != null) fadeShape = fadeShapeOf(shape);
     if (albums != null) albumsWhole = albums;
+    _save.soon();
+    notifyListeners();
+  }
+
+  void setPlayerView(String view) {
+    if (view == playerView || !_views.contains(view)) return;
+    playerView = view;
     _save.soon();
     notifyListeners();
   }

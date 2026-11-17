@@ -26,9 +26,6 @@ import 'widgets.dart';
 class NowPlaying extends StatefulWidget {
   const NowPlaying({super.key});
 
-  /// What the top shows: 'cover', 'tape' or 'video' (kept for the next time the player opens).
-  static String view = 'cover';
-
   static Future<void> open(BuildContext context) => Navigator.of(context, rootNavigator: true).push(PageRouteBuilder<void>(
         transitionDuration: const Duration(milliseconds: 340),
         reverseTransitionDuration: const Duration(milliseconds: 260),
@@ -48,7 +45,9 @@ class _NowPlayingState extends State<NowPlaying> {
   double? _dragging; // where the seek slider is held, in seconds
   double _pull = 0; // how far the page is pulled down to close it
 
-  void _setView(String v) => setState(() => NowPlaying.view = v);
+  /// What the top shows: 'cover', 'tape' or 'video' (a setting: it stays for the next song and the
+  /// next start of the app).
+  void _setView(String v) => setState(() => App.settings.setPlayerView(v));
 
   @override
   Widget build(BuildContext context) {
@@ -110,7 +109,7 @@ class _NowPlayingState extends State<NowPlaying> {
               onPressed: () => Navigator.of(context).pop(),
               icon: const Icon(Icons.keyboard_arrow_down_rounded, size: 32, color: Look.cream),
             ),
-            Expanded(child: Center(child: _Switch(view: NowPlaying.view, onPick: _setView))),
+            Expanded(child: Center(child: _Switch(view: App.settings.playerView, onPick: _setView))),
             IconButton(
               tooltip: 'More',
               onPressed: () => songMenu(context, t),
@@ -129,7 +128,7 @@ class _NowPlayingState extends State<NowPlaying> {
             child: LayoutBuilder(builder: (context, room) {
               final wide = box.maxWidth - 44;
               final high = max(0.0, room.maxHeight - 24);
-              final tape = NowPlaying.view == 'tape';
+              final tape = App.settings.playerView == 'tape';
               final art = tape ? min(wide, high * ratio) : min(wide, high);
               return Center(
                 child: SizedBox(
@@ -142,7 +141,7 @@ class _NowPlayingState extends State<NowPlaying> {
                       opacity: a,
                       child: ScaleTransition(scale: Tween(begin: 0.94, end: 1.0).animate(a), child: child),
                     ),
-                    child: switch (NowPlaying.view) {
+                    child: switch (App.settings.playerView) {
                       'tape' => SizedBox(key: const ValueKey('tape'), width: art, child: _Deck(track: t)),
                       'video' => VideoView(key: const ValueKey('video'), track: t, size: art),
                       _ => _BigCover(key: ValueKey('cover${t.id}'), track: t, size: art),

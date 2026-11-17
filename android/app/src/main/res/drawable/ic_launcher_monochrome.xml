@@ -1,20 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The themed icon (Android 13 and newer paint it in the wallpaper's colors): the heart of tape as a
-     line, and the cassette as one shape with its window open and both hubs in it. -->
+<!-- The themed icon (Android 13 and newer paint it in the wallpaper's colors): the cassette with the
+     pencil that wrote its label, in one color. Drawn in the color icon's own units, made small here. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#00000000"
-        android:strokeColor="#FFFFFFFF"
-        android:strokeWidth="2.6"
-        android:strokeLineCap="round"
-        android:strokeLineJoin="round"
-        android:pathData="M54.00,53.19C46.76,47.40 40.84,42.13 40.84,36.74C40.84,32.66 44.00,29.50 48.08,29.50C50.38,29.50 52.55,30.55 54.00,32.26C55.45,30.55 57.62,29.50 59.92,29.50C64.00,29.50 67.16,32.66 67.16,36.74C67.16,42.13 61.24,47.40 54.00,53.19Z" />
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:fillType="evenOdd"
-        android:pathData="M35.59,52.59H72.41Q74.93,52.59 74.93,55.10V76.86Q74.93,79.37 72.41,79.37H35.59Q33.08,79.37 33.08,76.86V55.10Q33.08,52.59 35.59,52.59ZM45.45,64.26H62.55Q65.30,64.26 65.30,67.00V67.00Q65.30,69.75 62.55,69.75H45.45Q42.70,69.75 42.70,67.00V67.00Q42.70,64.26 45.45,64.26ZM44.58,67.00A2.09,2.09 0 1,0 48.77,67.00A2.09,2.09 0 1,0 44.58,67.00ZM59.23,67.00A2.09,2.09 0 1,0 63.42,67.00A2.09,2.09 0 1,0 59.23,67.00ZM44.54,76.48A1.09,1.09 0 1,0 46.72,76.48A1.09,1.09 0 1,0 44.54,76.48ZM61.28,76.48A1.09,1.09 0 1,0 63.46,76.48A1.09,1.09 0 1,0 61.28,76.48Z" />
+    <group
+        android:translateX="54.0"
+        android:translateY="59.96"
+        android:rotation="-10"
+        android:scaleX="0.07757"
+        android:scaleY="0.07757">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M-310,-222 H310 A40,40 0 0 1 350,-182 V182 A40,40 0 0 1 310,222 H-310 A40,40 0 0 1 -350,182 V-182 A40,40 0 0 1 -310,-222 Z M-294,-194 H294 A18,18 0 0 1 312,-176 V80 A18,18 0 0 1 294,98 H-294 A18,18 0 0 1 -312,80 V-176 A18,18 0 0 1 -294,-194 Z M-140,204 L-112,150 H112 L140,204 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M-312,-86 H312 V-38 H-312 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M-118,-20 H118 A54,54 0 0 1 172,34 V34 A54,54 0 0 1 118,88 H-118 A54,54 0 0 1 -172,34 V34 A54,54 0 0 1 -118,-20 Z M-128,34 A30,30 0 1 0 -68,34 A30,30 0 1 0 -128,34 Z M68,34 A30,30 0 1 0 128,34 A30,30 0 1 0 68,34 Z" />
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M-111,34 A13,13 0 1 0 -85,34 A13,13 0 1 0 -111,34 Z M85,34 A13,13 0 1 0 111,34 A13,13 0 1 0 85,34 Z" />
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="#FFFFFFFF"
+            android:strokeWidth="16"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M-262,-122 c14,-30 26,-30 30,0 c4,26 18,26 30,-2 c10,-24 22,-26 30,-4 c8,20 22,22 34,2 c10,-18 24,-20 34,-4" />
+    </group>
+    <group
+        android:translateX="57.38"
+        android:translateY="50.54"
+        android:rotation="-47">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:fillType="evenOdd"
+            android:pathData="M0,0 L6.9,-2.3 H30.1 A0.9,0.9 0 0 1 31.0,-1.4 V1.4 A0.9,0.9 0 0 1 30.1,2.3 H6.9 Z M22.4,-2.3 H23.0 V2.3 H22.4 Z M26.5,-2.3 H27.1 V2.3 H26.5 Z M6.9,-2.3 L7.5,-2.3 L7.5,2.3 L6.9,2.3 Z" />
+    </group>
 </vector>

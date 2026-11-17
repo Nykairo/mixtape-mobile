@@ -112,8 +112,8 @@ class ShellState extends State<Shell> {
               ),
           ],
         ),
-        // Samples plays under a see-through bar; everywhere else the bar is solid, with a short fade
-        // above it, so a list never shows through the tabs or behind the phone's own keys
+        // Samples has a black bar its cards end above; everywhere else the bar is the page's color, with
+        // a short fade above it, so a list never shows through the tabs or behind the phone's own keys
         bottomNavigationBar: samples
             ? _NavBar(tab: _tab, onTap: _go, dark: true)
             : Column(mainAxisSize: MainAxisSize.min, children: [
@@ -165,9 +165,7 @@ class _NavBar extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: dark
-              ? [Colors.black.withValues(alpha: 0.0), Colors.black.withValues(alpha: 0.85)]
-              : [Look.bg, Look.bg],
+          colors: dark ? const [Colors.black, Colors.black] : [Look.bg, Look.bg],
         ),
       ),
       child: Padding(

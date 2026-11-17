@@ -424,7 +424,7 @@ void main() {
     await start(tester);
     await Box.startMusic(tester);
     await look(tester, 'home_playing');
-    NowPlaying.view = 'cover';
+    App.settings.setPlayerView('cover');
     unawaited(NowPlaying.open(inside(tester)));
     await look(tester, 'player');
     if (await tapText(tester, 'Tape')) await look(tester, 'player_tape');
@@ -446,7 +446,7 @@ void main() {
   testWidgets("The player's sheets", (tester) async {
     await start(tester);
     await Box.startMusic(tester);
-    NowPlaying.view = 'cover';
+    App.settings.setPlayerView('cover');
     unawaited(NowPlaying.open(inside(tester)));
     await wait(tester);
     final more = find.byTooltip('More').hitTestable();

@@ -87,11 +87,33 @@ List<Item> pickVideos(List<Item> rows, String title, String artist, int dur, {in
 
 class Videos {
   static final _found = <String, MusicVideo?>{};
+  static final _looking = <String, Future<MusicVideo?>>{};
   static final _heat = <String, Heat>{};
+  static final _streams = <String, (String, String, DateTime)>{};
+  static final _opening = <String, Future<(String, String)>>{};
 
-  /// A song's music video, or null when it has none that goes with it. Looked up once per song.
-  static Future<MusicVideo?> find(Track t) async {
-    if (_found.containsKey(t.id)) return _found[t.id];
+  /// A song's music video, or null when it has none that goes with it. Looked up once per song (two
+  /// asking at once share the one look).
+  static Future<MusicVideo?> find(Track t) {
+    if (_found.containsKey(t.id)) return Future.value(_found[t.id]);
+    return _looking[t.id] ??= _look(t).whenComplete(() => _looking.remove(t.id));
+  }
+
+  /// Video mode: the videos of these songs (the one that starts, and the next) looked up ahead, so the
+  /// player has the picture at once. One that can't be found now is tried again when the player shows.
+  static Future<void> prepare(Iterable<Track> songs) async {
+    for (final t in songs) {
+      if (t.src != 'yt') continue;
+      try {
+        final v = await find(t);
+        if (v != null) await stream(v.id);
+      } on Object {
+        // the player tries again
+      }
+    }
+  }
+
+  static Future<MusicVideo?> _look(Track t) async {
     MusicVideo? got;
     if (t.src == 'yt') {
       final artist = t.artist.split(',').first.trim();
@@ -137,10 +159,26 @@ class Videos {
   /// The "most replayed" curve of a song (Samples starts each song at its best part with it).
   static Future<Heat> curve(String id) => _curve(id);
 
-  /// Where a video's picture streams from: (address, user agent).
-  static Future<(String, String)> stream(String id) async {
+  /// Where a video's picture streams from: (address, user agent). An address holds for a few hours, so
+  /// one found in the last hour is used again.
+  static Future<(String, String)> stream(String id) {
+    final have = _streams[id];
+    if (have != null && DateTime.now().difference(have.$3) < const Duration(hours: 1)) {
+      return Future.value((have.$1, have.$2));
+    }
+    return _opening[id] ??= _open(id).whenComplete(() => _opening.remove(id));
+  }
+
+  static Future<(String, String)> _open(String id) async {
     final got = await _streamInfo(id);
-    return ('${got['url'] ?? ''}', '${got['agent'] ?? ''}');
+    final url = '${got['url'] ?? ''}', agent = '${got['agent'] ?? ''}';
+    if (url.isNotEmpty) {
+      _streams[id] = (url, agent, DateTime.now());
+      while (_streams.length > 20) {
+        _streams.remove(_streams.keys.first);
+      }
+    }
+    return (url, agent);
   }
 
   static Future<Map<String, Object?>> _streamInfo(String id) async {
