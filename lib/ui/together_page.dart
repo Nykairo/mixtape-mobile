@@ -4,7 +4,6 @@
 library;
 
 import 'dart:async';
-import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -206,7 +205,7 @@ class _TogetherPageState extends State<TogetherPage> {
 
   Future<void> _shareCode(String code, bool party) async {
     final text = 'Join my ${party ? 'party' : 'room'} on Mixtape with the code $code';
-    if (Platform.isAndroid && await MixtapeNative.share(text)) return;
+    if (await MixtapeNative.share(text)) return;
     await Clipboard.setData(ClipboardData(text: code));
     if (mounted) say(context, 'Code copied');
   }

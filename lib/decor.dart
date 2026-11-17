@@ -293,7 +293,9 @@ Paint _paintOf(Object? b, int k) {
         center, _num(r[2], 0.5), colors, stops, TileMode.clamp, null, focal == center ? null : focal);
 }
 
-const _holo = [Color(0xFFFF7AC0), Color(0xFFFFD36B), Color(0xFF9AF7B0), Color(0xFF73D8FF), Color(0xFFB394FF), Color(0xFFFF7AC0)];
+/// The holo foil's colors, going round. Qt goes round the other way, so they're listed backwards.
+const _holo = [Color(0xFFFF7AC0), Color(0xFFB394FF), Color(0xFF73D8FF), Color(0xFF9AF7B0), Color(0xFFFFD36B), Color(0xFFFF7AC0)];
+const _holoStops = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0];
 
 ui.Image? _glitterTile;
 
@@ -399,7 +401,7 @@ void paintSticker(Canvas canvas, String shape, double s, Color color, {String fi
         Paint()
           ..color = const Color(0x80000000)
           ..blendMode = BlendMode.hardLight
-          ..shader = ui.Gradient.sweep(Offset(-s * 0.16, -s * 0.2), _holo, null, TileMode.clamp, -pi / 6, 2 * pi - pi / 6));
+          ..shader = ui.Gradient.sweep(Offset(-s * 0.16, -s * 0.2), _holo, _holoStops, TileMode.clamp, -pi / 6, 2 * pi - pi / 6));
     if (detail) {
       canvas.drawRect(
           box,
@@ -536,10 +538,17 @@ void paintItems(Canvas canvas, Geo g, Object? items, {Map<String, ui.Image> pict
   for (var k = 0; k < items.length; k++) {
     final it = items[k];
     if (k == skip || it is! Map) continue;
+    final depth = canvas.getSaveCount();
     try {
       paintItem(canvas, g, it, pictures: pictures, detail: detail);
-    } on Object {
-      continue; // one odd sticker never takes the whole tape with it
+    } on Object catch (e, stack) {
+      // one odd sticker never takes the whole tape with it (while testing, it still says so)
+      assert(() {
+        FlutterError.reportError(FlutterErrorDetails(exception: e, stack: stack, library: 'decor'));
+        return true;
+      }());
+    } finally {
+      canvas.restoreToCount(depth);
     }
   }
   canvas.restore();

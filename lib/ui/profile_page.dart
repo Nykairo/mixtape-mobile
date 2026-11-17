@@ -4,9 +4,7 @@
 /// show; and the artists you've played most lately.
 library;
 
-import 'dart:collection';
 import 'dart:convert';
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -58,7 +56,7 @@ String _initials(Map<Object?, Object?> p) {
 }
 
 /// Profile pictures read back, by account and version, a few dozen at most.
-final _faces = LinkedHashMap<String, Uint8List>();
+final _faces = <String, Uint8List>{}; // a map keeps its order: the oldest go first
 
 Uint8List? _face(Map<Object?, Object?> p) {
   final data = '${p['avatar'] ?? ''}';
@@ -479,10 +477,6 @@ class _ProfileEditPageState extends State<ProfileEditPage> {
   }
 
   Future<void> _pickPicture() async {
-    if (!Platform.isAndroid) {
-      say(context, 'Pick your picture on the computer for now: it shows here too.');
-      return;
-    }
     final data = await MixtapeNative.pickPicture();
     if (data == null || !mounted) return;
     setState(() => _picture = data);

@@ -883,10 +883,6 @@ Future<void> writeOn(BuildContext context, Decorations d, int k) async {
 
 /// A photo from the phone for the tape: a new one, or in place of the picked one's picture.
 Future<void> addPhoto(BuildContext context, Decorations d, {bool replace = false}) async {
-  if (!Platform.isAndroid) {
-    say(context, 'Stick photos on with the computer for now: they show here too.');
-    return;
-  }
   if (!replace && d.full) {
     say(context, 'This tape is full. Take something off first.');
     return;

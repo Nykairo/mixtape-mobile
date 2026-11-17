@@ -1,6 +1,7 @@
 /// Mixtape's home screen widgets, from the app's side: tells them what plays and which tapes there are,
 /// and does what's tapped on them (like, shuffle, open a tape and play it). The widgets themselves are
-/// drawn on the Android side (packages/mixtape_native: Widgets.kt).
+/// drawn on the Android side (packages/mixtape_native: Widgets.kt) and by WidgetKit on the iPhone
+/// (ios-extras/widgets).
 library;
 
 import 'dart:async';
@@ -31,9 +32,8 @@ class HomeWidgets {
   static bool _started = false;
 
   /// Starts telling the widgets about the music and the tapes, and listening to what's tapped on them.
-  /// Android only: elsewhere there are none.
   static void start() {
-    if (_started || !Platform.isAndroid) return;
+    if (_started || !(Platform.isAndroid || Platform.isIOS)) return;
     _started = true;
     final audio = App.audio;
     audio.mediaItem.listen((_) => _later());
@@ -71,7 +71,7 @@ class HomeWidgets {
     _shelfSoon = Timer(const Duration(milliseconds: 800), _sendShelf);
   }
 
-  /// The colors of a tape's cassette, as numbers for the Android side.
+  /// The colors of a tape's cassette, as numbers for the widgets.
   static Map<String, Object?> colors(TapeLook l) => {
         'shell': l.shell.toARGB32(),
         'shellAlpha': l.shellAlpha,
@@ -114,7 +114,7 @@ class HomeWidgets {
     });
   }
 
-  /// The cover as a file the Android side can read, fetched once per song (big enough for the Cover
+  /// The cover as a file the widgets' side can read, fetched once per song (big enough for the Cover
   /// widget on a big phone).
   static Future<String> _cover(Track t) async {
     final address = t.artAt(544);
@@ -187,6 +187,17 @@ class HomeWidgets {
 
   static void _tapped(String what) {
     final audio = App.audio;
+    // the keys on the iPhone's widgets come this way (on Android they go to the player directly)
+    switch (what) {
+      case 'play':
+        audio.play();
+      case 'pause':
+        audio.pause();
+      case 'next':
+        audio.skipToNext();
+      case 'previous':
+        audio.skipToPrevious();
+    }
     if (what == 'like') {
       final t = audio.current;
       if (t != null) App.library.toggleLike(t);
