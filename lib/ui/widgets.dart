@@ -289,6 +289,7 @@ Future<void> songMenu(BuildContext context, Track t, {Tape? tape, int? index}) {
 
       final liked = lib.isLiked(t);
       final saved = App.downloads.has(t);
+      final playingIt = App.audio.current?.id == t.id;
       final artistId = '${t.extra['artist_id'] ?? ''}';
       final albumId = '${t.extra['album_id'] ?? ''}';
       return SafeArea(
@@ -314,9 +315,9 @@ Future<void> songMenu(BuildContext context, Track t, {Tape? tape, int? index}) {
                 Padding(
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 10),
                   child: Row(children: [
-                    _Big(Icons.playlist_play_rounded, 'Play next', () {
+                    _Big(Icons.playlist_play_rounded, playingIt ? 'Again next' : 'Play next', () {
                       App.audio.playNext(t);
-                      done('Plays after this one');
+                      done(playingIt ? 'Plays again after this' : 'Plays after this one');
                     }),
                     _Big(Icons.queue_music_rounded, 'Add to queue', () {
                       App.audio.addSongs([t]);
@@ -337,6 +338,18 @@ Future<void> songMenu(BuildContext context, Track t, {Tape? tape, int? index}) {
                 _MenuRow(Icons.radio_rounded, 'Start radio', () {
                   App.audio.playSongs([t], from: '${t.title} radio');
                   done('Playing ${t.title}, and songs like it after');
+                }),
+              if (t.src == 'yt')
+                _MenuRow(Icons.auto_awesome_rounded, 'Songs like this', () {
+                  Navigator.of(sheet).pop();
+                  Shell.push(LoadingMix(
+                    title: 'Songs like ${t.title}',
+                    slot: 3,
+                    load: () async => [
+                      for (final s in (await Music.next(t.ref)).songs)
+                        if (s.id != t.id) s,
+                    ],
+                  ));
                 }),
               if (artistId.isNotEmpty || t.artist.isNotEmpty)
                 _MenuRow(Icons.person_outline_rounded, 'Go to ${t.artist.split(',').first}', () {
@@ -668,7 +681,7 @@ class ItemCard extends StatelessWidget {
       width: width,
       child: InkWell(
         onTap: () => openItem(context, item, list: list),
-        onLongPress: item.playable ? () => songMenu(context, item.track) : null,
+        onLongPress: () => item.playable ? songMenu(context, item.track) : itemMenu(context, item),
         borderRadius: BorderRadius.circular(10),
         child: Padding(
           padding: const EdgeInsets.all(5),
@@ -770,6 +783,7 @@ class ItemRow extends StatelessWidget {
     final sub = [kind, if (item.subtitle.isNotEmpty) item.subtitle].join('  ·  ');
     return InkWell(
       onTap: () => openItem(context, item),
+      onLongPress: () => itemMenu(context, item),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 7, 12, 7),
         child: Row(children: [
@@ -786,6 +800,85 @@ class ItemRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// What can be done with an album, a playlist or an artist without opening it (the computer's card
+/// menu): play it, shuffle it, put it next or at the end of the queue or on a tape, an artist's radio.
+Future<void> itemMenu(BuildContext context, Item item) async {
+  final artist = item.kind == Kind.artist;
+  if (!artist && item.kind != Kind.album && item.kind != Kind.playlist) return;
+  await showModalBottomSheet<void>(
+    context: context,
+    useRootNavigator: true,
+    builder: (sheet) {
+      // the songs come from YouTube Music first; the sheet is gone by then
+      Future<void> go(String word, Future<void> Function(List<Track> songs) then) async {
+        Navigator.of(sheet).pop();
+        say(context, 'Getting ${item.title}…');
+        try {
+          final songs = artist
+              ? await _artistRadio(item)
+              : [
+                  for (final t in (await Music.list(item.id)).songs)
+                    if (t.playable) t,
+                ];
+          if (!context.mounted) return;
+          if (songs.isEmpty) {
+            say(context, 'Nothing in it to play');
+            return;
+          }
+          await then(songs);
+          if (word.isNotEmpty && context.mounted) say(context, word);
+        } on Object {
+          if (context.mounted) say(context, "YouTube Music didn't answer. Check the internet connection.");
+        }
+      }
+
+      final kind = switch (item.kind) {
+        Kind.album => 'Album',
+        Kind.artist => 'Artist',
+        _ => 'Playlist',
+      };
+      return SafeArea(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          ListTile(
+            leading: Pic(item.art, size: 46, radius: 6, round: artist, icon: artist ? Icons.person_rounded : null),
+            title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(15.5, weight: FontWeight.w700)),
+            subtitle: Text([kind, if (item.subtitle.isNotEmpty) item.subtitle].join('  ·  '),
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(13, color: Look.muted)),
+          ),
+          const Divider(height: 1),
+          if (artist)
+            _MenuRow(Icons.radio_rounded, 'Artist radio', () => go('', (s) => App.audio.playSongs(s, from: '${item.title} radio')))
+          else ...[
+            _MenuRow(Icons.play_arrow_rounded, 'Play', () => go('', (s) => App.audio.playSongs(s, from: item.title))),
+            _MenuRow(Icons.shuffle_rounded, 'Shuffle play',
+                () => go('', (s) => App.audio.playSongs(s, shuffle: true, from: item.title))),
+            _MenuRow(Icons.playlist_play_rounded, 'Play next', () => go('Plays after this one', (s) async {
+                  for (final t in s.reversed) {
+                    await App.audio.playNext(t);
+                  }
+                })),
+            _MenuRow(Icons.queue_music_rounded, 'Add to queue', () => go('Added to the queue', App.audio.addSongs)),
+            _MenuRow(Icons.library_add_rounded, 'Put on a tape', () => go('', (s) => pickTape(context, s))),
+          ],
+          _MenuRow(Icons.open_in_new_rounded, 'Open', () {
+            Navigator.of(sheet).pop();
+            openItem(context, item);
+          }),
+          const SizedBox(height: 8),
+        ]),
+      );
+    },
+  );
+}
+
+/// An artist's radio: YouTube Music's mix for them, from the song it starts with.
+Future<List<Track>> _artistRadio(Item item) async {
+  final a = await Music.artist(item.id);
+  final seed = a.radioSeed.isNotEmpty ? a.radioSeed : (a.songs.isEmpty ? '' : a.songs.first.ref);
+  if (seed.isEmpty) return const [];
+  return (await Music.next(seed, playlist: a.radio)).songs;
 }
 
 /// Opens what was tapped: a song or a video plays (in its list), the rest opens its page.
