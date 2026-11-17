@@ -297,33 +297,36 @@ class _Chips extends StatelessWidget {
     return SizedBox(
       height: 38,
       child: ListView(scrollDirection: Axis.horizontal, children: [
-        ListenableBuilder(
-          listenable: App.downloads,
-          builder: (context, _) {
-            final d = App.downloads;
-            final saved = d.has(track);
-            final busy = d.isWaiting(track);
-            return Pill(
-              saved ? Icons.arrow_circle_down_rounded : (busy ? Icons.downloading_rounded : Icons.arrow_circle_down_outlined),
-              saved ? 'On the phone' : (busy ? 'Saving…' : 'Save'),
-              track.src != 'yt' || busy
-                  ? null
-                  : () {
-                      if (saved) {
-                        d.remove([track]);
-                      } else {
-                        d.save([track]);
-                      }
-                    },
-              on: saved,
-            );
-          },
-        ),
-        const SizedBox(width: 8),
-        Pill(Icons.library_add_outlined, 'Tape', () => pickTape(context, [track])),
-        const SizedBox(width: 8),
-        Pill(Icons.ios_share_rounded, 'Share', () => shareSong(context, track)),
-        const SizedBox(width: 8),
+        // a phone's own file is on the phone already, and plays nowhere else: no saving, tapes or sharing
+        if (!track.fromPhone) ...[
+          ListenableBuilder(
+            listenable: App.downloads,
+            builder: (context, _) {
+              final d = App.downloads;
+              final saved = d.has(track);
+              final busy = d.isWaiting(track);
+              return Pill(
+                saved ? Icons.arrow_circle_down_rounded : (busy ? Icons.downloading_rounded : Icons.arrow_circle_down_outlined),
+                saved ? 'On the phone' : (busy ? 'Saving…' : 'Save'),
+                track.src != 'yt' || busy
+                    ? null
+                    : () {
+                        if (saved) {
+                          d.remove([track]);
+                        } else {
+                          d.save([track]);
+                        }
+                      },
+                on: saved,
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          Pill(Icons.library_add_outlined, 'Tape', () => pickTape(context, [track])),
+          const SizedBox(width: 8),
+          Pill(Icons.ios_share_rounded, 'Share', () => shareSong(context, track)),
+          const SizedBox(width: 8),
+        ],
         const _SleepPill(),
         const SizedBox(width: 8),
         StreamBuilder<PlaybackState>(
