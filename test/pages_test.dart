@@ -11,6 +11,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mixtape/app.dart';
+import 'package:mixtape/cassette.dart';
+import 'package:mixtape/decor.dart';
 import 'package:mixtape/rooms.dart' as rooms;
 import 'package:mixtape/ui/now_playing.dart';
 import 'package:mixtape/ui/pages.dart';
@@ -159,6 +161,85 @@ void main() {
     await wait(tester);
     expect(find.text('Tape studio'), findsOneWidget);
     await shot(tester, 'studio');
+    await close(tester);
+  });
+
+  testWidgets('Decorating a tape: moving a label, a sticker, a note, the pen, undo, and Done', (tester) async {
+    await pumpApp(tester);
+    final tape = App.library.tapes['Night drive']!;
+    unawaited(StudioPage.open(inside(tester), tape));
+    await wait(tester);
+    expect(find.text('DECOR'), findsOneWidget);
+    expect(find.text('Surprise me'), findsOneWidget);
+    expect(find.text('Take all off'), findsOneWidget, reason: 'the computer stuck things on this tape');
+    await shot(tester, 'studio_decor');
+
+    // the label the computer stuck on, picked with a tap and dragged to the right
+    final cassette = tester.getRect(find.byType(Cassette));
+    final label = Offset(cassette.left + cassette.width * 0.5, cassette.top + cassette.height * 0.74);
+    await tester.tapAt(label);
+    await wait(tester);
+    expect(find.text('Change the words'), findsOneWidget);
+    await tester.dragFrom(label, const Offset(36, -10));
+    await wait(tester);
+    await shot(tester, 'studio_label');
+    await tester.tap(find.widgetWithText(TextButton, 'Done'));
+    await wait(tester);
+
+    // a sticker from the sheet, made holo
+    await tester.tap(find.text('Sticker'));
+    await wait(tester);
+    expect(find.text('Stickers'), findsOneWidget);
+    await shot(tester, 'sticker_sheet');
+    await tester.tap(find.byTooltip(StickerSheet.the!.nameOf('vinyl')));
+    await wait(tester);
+    expect(find.text('Swap sticker'), findsOneWidget);
+    await tester.tap(find.byTooltip('Holo'));
+    await wait(tester);
+    await shot(tester, 'studio_sticker');
+    await tester.tap(find.widgetWithText(TextButton, 'Done'));
+    await wait(tester);
+
+    // a sticky note, written on right away
+    await tester.tap(find.text('Sticky note'));
+    await wait(tester);
+    final ask = find.byType(AlertDialog);
+    expect(ask, findsOneWidget);
+    await tester.enterText(find.descendant(of: ask, matching: find.byType(TextField)), 'turn it up');
+    await tester.tap(find.descendant(of: ask, matching: find.text('Done')));
+    await wait(tester);
+    await tester.tap(find.widgetWithText(TextButton, 'Done'));
+    await wait(tester);
+
+    // a line with the pen, taken back with undo
+    await tester.tap(find.text('Pen'));
+    await wait(tester);
+    expect(find.text('Done drawing'), findsOneWidget);
+    await tester.dragFrom(cassette.center + const Offset(-50, 6), const Offset(100, -24));
+    await wait(tester);
+    await shot(tester, 'studio_pen');
+    await tester.tap(find.text('Done drawing'));
+    await wait(tester);
+    await tester.tap(find.byTooltip('Undo'));
+    await wait(tester);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Done'));
+    for (var k = 0; k < 40 && App.library.layerOf(tape) == null; k++) {
+      await wait(tester, rounds: 1);
+    }
+    await wait(tester);
+    expect(find.text('Tape studio'), findsNothing);
+    final items = [for (final it in tape.design!['items'] as List) Map<String, Object?>.from(it as Map)];
+    expect(items.length, Box.decorations.length + 2, reason: 'a sticker and a note more, the line taken back');
+    expect(items.where((it) => it['kind'] == 'ink').length, 1);
+    expect(items.any((it) => it['shape'] == 'vinyl' && it['finish'] == 'holo'), isTrue);
+    expect(items.any((it) => it['kind'] == 'note' && it['text'] == 'turn it up'), isTrue);
+    expect(items.firstWhere((it) => it['kind'] == 'dymo')['x'] as double, greaterThan(0.55));
+    expect(App.library.layerOf(tape), isNotNull, reason: 'the phones get a drawing of it all');
+
+    // the drawing goes to the account with the tape, so the other phones have it too
+    await tester.runAsync(() => App.library.sync());
+    expect(Box.account.pictures.containsKey(tape.design!['layer']), isTrue);
     await close(tester);
   });
 

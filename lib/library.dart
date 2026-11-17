@@ -5,9 +5,11 @@ library;
 import 'dart:async';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
 import 'account.dart';
+import 'decor.dart' show picturesOf;
 import 'model.dart';
 import 'store.dart';
 
@@ -305,13 +307,17 @@ class Library extends ChangeNotifier {
     _changed(sync: false);
   }
 
-  /// A tape's new look from the tape studio (the computer's stickers and photos on it stay).
-  void setDesign(Tape tape, Map<String, Object?> design, {int? paper}) {
+  /// A tape's new look from the tape studio. With [items], what's stuck and drawn on it changes too
+  /// ([layer]: their picture for the phones, see keepLayer); otherwise the ones it has stay.
+  void setDesign(Tape tape, Map<String, Object?> design, {int? paper, List<Map<String, Object?>>? items, String? layer}) {
     final keep = tape.design ?? const {};
     tape.design = {
-      for (final e in keep.entries)
-        if (const {'items', 'layer'}.contains(e.key)) e.key: e.value,
+      if (items == null)
+        for (final e in keep.entries)
+          if (const {'items', 'layer'}.contains(e.key)) e.key: e.value,
       ...design,
+      if (items != null && items.isNotEmpty) 'items': items,
+      if (items != null && items.isNotEmpty && layer != null) 'layer': layer,
     };
     if (paper != null) tape.paper = paper;
     _changed();
@@ -438,6 +444,20 @@ class Library extends ChangeNotifier {
         if (!tapes.containsKey(n)) n,
     ];
     if (changed.isNotEmpty) {
+      // the pictures first, so the computer finds them when the tapes arrive
+      await account.pushPictures({
+        for (final d in changed.values)
+          if (d['design'] case final Map<String, Object?> design) ...{
+            ...picturesOf(design['items']),
+            if (design['layer'] case final String layer) layer,
+          },
+      }, (name) async {
+        try {
+          return await havePicture(name)?.readAsBytes();
+        } on FileSystemException {
+          return null;
+        }
+      });
       await account.pushTapes(changed);
       _known.addAll(stamps);
     }
@@ -487,13 +507,69 @@ class Library extends ChangeNotifier {
 
   // ------------------------------------------------------------ decorations
 
-  /// The picture of a tape's stickers, photos and doodles, as the computer drew it (the phone lays it
-  /// over its own cassette), or null when the tape has none or it isn't here yet.
+  /// The picture of a tape's stickers, photos and doodles, as the computer (or the studio here) drew
+  /// it: the phone lays it over its own cassette. Null when the tape has none or it isn't here yet.
   String? layerOf(Tape tape) {
     final name = tape.design?['layer'];
     if (name is! String || !picturePattern.hasMatch(name)) return null;
     final f = Store.the.file('layers/$name');
     return f.existsSync() ? f.path : null;
+  }
+
+  /// A photo for a tape (as the picker made it), kept under a name made from the picture itself, the
+  /// computer's way: the same picture always gets the same name, on every device.
+  Future<String> keepPicture(List<int> bytes, {required bool png}) =>
+      _keep('pictures', bytes, png ? 'png' : 'jpg');
+
+  /// The drawing of a tape's decorations for the phones (see decor.layerPng).
+  Future<String> keepLayer(List<int> png) => _keep('layers', png, 'png');
+
+  Future<String> _keep(String folder, List<int> bytes, String ext) async {
+    final name = '${sha1.convert(bytes).toString().substring(0, 20)}.$ext';
+    final f = Store.the.file('$folder/$name');
+    if (!f.existsSync()) {
+      await f.parent.create(recursive: true);
+      final tmp = File('${f.path}.tmp');
+      await tmp.writeAsBytes(bytes, flush: true);
+      await tmp.rename(f.path);
+    }
+    return name;
+  }
+
+  /// A picture from the tapes' decorations, if it's on the phone.
+  File? havePicture(String name) {
+    if (!picturePattern.hasMatch(name)) return null;
+    for (final folder in const ['pictures', 'layers']) {
+      final f = Store.the.file('$folder/$name');
+      if (f.existsSync()) return f;
+    }
+    return null;
+  }
+
+  /// The photos on a tape the phone doesn't have yet, from the account (when signed in). Returns the
+  /// ones that came; whatever doesn't come shows as an empty frame.
+  Future<Set<String>> fetchPictures(Iterable<String> names) async {
+    final missing = [
+      for (final n in names)
+        if (havePicture(n) == null) n,
+    ];
+    if (missing.isEmpty || !account.signedIn) return const {};
+    final Map<String, List<int>> got;
+    try {
+      got = await account.pullPictures(missing);
+    } on Object {
+      return const {}; // no connection or no answer: they come another time
+    }
+    final came = <String>{};
+    for (final e in got.entries) {
+      try {
+        await _keep('pictures', e.value, e.key.endsWith('.png') ? 'png' : 'jpg');
+        came.add(e.key);
+      } on FileSystemException {
+        continue; // a full phone: that one stays an empty frame
+      }
+    }
+    return came;
   }
 
   /// Fetches the decoration pictures this phone doesn't have yet, and lets go of the ones no tape uses.
@@ -515,14 +591,29 @@ class Library extends ChangeNotifier {
         await File('${dir.path}/${e.key}').writeAsBytes(e.value, flush: true);
       }
     }
-    if (dir.existsSync()) {
+    tidyPictures();
+  }
+
+  /// Lets go of the decoration pictures no tape uses anymore. One from the last day stays: the tape
+  /// studio may still be about to use it.
+  void tidyPictures() {
+    final used = <String>{
+      for (final t in tapes.values) ...{
+        ...picturesOf(t.design?['items']),
+        if (t.design?['layer'] case final String name) name,
+      },
+    };
+    final young = DateTime.now().subtract(const Duration(days: 1));
+    for (final folder in const ['layers', 'pictures']) {
+      final dir = Directory('${Store.the.dir.path}/$folder');
+      if (!dir.existsSync()) continue;
       for (final f in dir.listSync().whereType<File>()) {
-        if (!want.contains(f.uri.pathSegments.last)) {
-          try {
-            f.deleteSync();
-          } on FileSystemException {
-            // in use a moment longer: next time
-          }
+        if (used.contains(f.uri.pathSegments.last)) continue;
+        try {
+          if (f.lastModifiedSync().isAfter(young)) continue;
+          f.deleteSync();
+        } on FileSystemException {
+          // in use a moment longer: next time
         }
       }
     }

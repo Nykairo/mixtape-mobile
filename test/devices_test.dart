@@ -241,8 +241,26 @@ void main() {
     await wait(tester);
     unawaited(StudioPage.open(inside(tester), App.library.tapes['Night drive']!));
     await look(tester, 'studio');
-    await scroll(tester, 0.6);
-    await look(tester, 'studio_2');
+    // the sticker sheet, a sticker on the tape with everything it can do, the other tabs, and leaving
+    // without Done
+    if (await tapText(tester, 'Sticker')) {
+      await look(tester, 'sticker_sheet');
+      final cells = find.byType(Tooltip).hitTestable();
+      if (cells.evaluate().isNotEmpty) {
+        await tester.tap(cells.first);
+        await look(tester, 'studio_sticker');
+        await scroll(tester, 0.5);
+        await look(tester, 'studio_sticker_2');
+      }
+    }
+    for (final tab in ['SHELL', 'LABEL', 'REELS', 'NOTE']) {
+      await tapText(tester, tab);
+      await look(tester, 'studio_${tab.toLowerCase()}');
+    }
+    await tester.binding.handlePopRoute();
+    await wait(tester);
+    await tester.binding.handlePopRoute();
+    await look(tester, 'studio_leave');
     await close(tester);
   });
 

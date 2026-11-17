@@ -340,7 +340,7 @@ class CassettePainter extends CustomPainter {
         canvas.restore();
       }
     }
-    if (note) _note(canvas, nc, ns, tilt);
+    if (note) paintSticky(canvas, nc, ns, tilt, sticky, look.note);
   }
 
   void _stripes(Canvas canvas, Rect L) {
@@ -509,73 +509,6 @@ class CassettePainter extends CustomPainter {
     }
   }
 
-  /// A square note stuck on with its glue strip at the top, so the bottom edge lifts a little.
-  void _note(Canvas canvas, Offset c, double s, double tilt) {
-    canvas.save();
-    canvas.translate(c.dx, c.dy);
-    canvas.rotate(tilt * pi / 180);
-    final r = Rect.fromCenter(center: Offset.zero, width: s, height: s);
-    for (final (k, a) in const [(3.0, 14), (2.0, 20), (1.0, 34)]) {
-      final d = s * 0.014 * k;
-      final sh = Path()
-        ..moveTo(r.left + d * 0.3, r.top + s * 0.2)
-        ..lineTo(r.right + d * 0.8, r.top + s * 0.2)
-        ..lineTo(r.right + d * 0.9, r.bottom + d * 1.5)
-        ..quadraticBezierTo(r.center.dx, r.bottom + d * 0.6, r.left + d * 0.5, r.bottom + d * 1.2)
-        ..close();
-      canvas.drawPath(sh, Paint()..color = _alpha(Colors.black, a));
-    }
-    final base = look.note;
-    canvas.drawRect(
-        r,
-        Paint()
-          ..shader = ui.Gradient.linear(r.topCenter, r.bottomCenter,
-              [_darker(base, 1.07), _darker(base, 1.03), base, _lighter(base, 1.02), _darker(base, 1.04)], const [0, 0.16, 0.2, 0.86, 1]));
-    canvas.drawRect(
-        r,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = max(0.6, s * 0.01)
-          ..color = _alpha(const Color(0xFF5A4410), 40));
-    final curl = Path()
-      ..moveTo(r.right, r.bottom - s * 0.34)
-      ..lineTo(r.right, r.bottom)
-      ..lineTo(r.right - s * 0.34, r.bottom)
-      ..close();
-    canvas.drawPath(
-        curl,
-        Paint()
-          ..shader = ui.Gradient.linear(Offset(r.right - s * 0.32, r.bottom - s * 0.32), r.bottomRight,
-              [_alpha(Colors.white, 0), _alpha(Colors.white, 46), _alpha(Colors.black, 18)], const [0, 0.75, 1]));
-    final box = Rect.fromLTRB(r.left + s * 0.11, r.top + s * 0.2, r.right - s * 0.09, r.bottom - s * 0.1);
-    final text = sticky.trim();
-    final words = text.split(RegExp(r'\s+'));
-    TextStyle hand(double px) => TextStyle(fontFamily: 'Covered By Your Grace', fontSize: px, height: 0.78, color: Look.ink);
-    // a word never breaks in two on a note: the writing gets smaller until the longest one fits
-    double widest(double px) {
-      var most = 0.0;
-      for (final w in words) {
-        final t = _text(w, hand(px));
-        most = max(most, t.width);
-        t.dispose();
-      }
-      return most;
-    }
-
-    var px = box.height * 0.56;
-    TextPainter tp;
-    while (true) {
-      tp = _text(text, hand(px), width: box.width, lines: 3, align: TextAlign.center);
-      final fits = !tp.didExceedMaxLines && tp.height <= box.height * 1.1 && widest(px) <= box.width;
-      if (fits || px <= max(5.0, box.height * 0.2)) break;
-      tp.dispose();
-      px -= 0.5;
-    }
-    tp.paint(canvas, Offset(box.left + (box.width - tp.width) / 2, box.center.dy - tp.height / 2));
-    tp.dispose();
-    canvas.restore();
-  }
-
   @override
   bool shouldRepaint(CassettePainter old) =>
       old.look != look ||
@@ -587,6 +520,84 @@ class CassettePainter extends CustomPainter {
       old.cover != cover ||
       (look.seeThrough && (old.progress - progress).abs() > 0.01);
 }
+
+/// A square note stuck on with its glue strip at the top, so the bottom edge lifts a little: [s] across
+/// at [c], turned [tilt] degrees, in [base], with [sticky] written on it by hand.
+void paintSticky(Canvas canvas, Offset c, double s, double tilt, String sticky, Color base, {int lines = 3}) {
+  canvas.save();
+  canvas.translate(c.dx, c.dy);
+  canvas.rotate(tilt * pi / 180);
+  final r = Rect.fromCenter(center: Offset.zero, width: s, height: s);
+  for (final (k, a) in const [(3.0, 14), (2.0, 20), (1.0, 34)]) {
+    final d = s * 0.014 * k;
+    final sh = Path()
+      ..moveTo(r.left + d * 0.3, r.top + s * 0.2)
+      ..lineTo(r.right + d * 0.8, r.top + s * 0.2)
+      ..lineTo(r.right + d * 0.9, r.bottom + d * 1.5)
+      ..quadraticBezierTo(r.center.dx, r.bottom + d * 0.6, r.left + d * 0.5, r.bottom + d * 1.2)
+      ..close();
+    canvas.drawPath(sh, Paint()..color = _alpha(Colors.black, a));
+  }
+  canvas.drawRect(
+      r,
+      Paint()
+        ..shader = ui.Gradient.linear(r.topCenter, r.bottomCenter,
+            [_darker(base, 1.07), _darker(base, 1.03), base, _lighter(base, 1.02), _darker(base, 1.04)], const [0, 0.16, 0.2, 0.86, 1]));
+  canvas.drawRect(
+      r,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = max(0.6, s * 0.01)
+        ..color = _alpha(const Color(0xFF5A4410), 40));
+  final curl = Path()
+    ..moveTo(r.right, r.bottom - s * 0.34)
+    ..lineTo(r.right, r.bottom)
+    ..lineTo(r.right - s * 0.34, r.bottom)
+    ..close();
+  canvas.drawPath(
+      curl,
+      Paint()
+        ..shader = ui.Gradient.linear(Offset(r.right - s * 0.32, r.bottom - s * 0.32), r.bottomRight,
+            [_alpha(Colors.white, 0), _alpha(Colors.white, 46), _alpha(Colors.black, 18)], const [0, 0.75, 1]));
+  final box = Rect.fromLTRB(r.left + s * 0.11, r.top + s * 0.2, r.right - s * 0.09, r.bottom - s * 0.1);
+  final text = sticky.trim();
+  final words = text.split(RegExp(r'\s+'));
+  TextStyle hand(double px) => TextStyle(fontFamily: 'Covered By Your Grace', fontSize: px, height: 0.78, color: Look.ink);
+  // a word never breaks in two on a note: the writing gets smaller until the longest one fits
+  double widest(double px) {
+    var most = 0.0;
+    for (final w in words) {
+      final t = _text(w, hand(px));
+      most = max(most, t.width);
+      t.dispose();
+    }
+    return most;
+  }
+
+  // the size found once is kept: a note that is dragged around in the studio doesn't look again
+  final key = '$lines ${box.width.round()} $text';
+  final known = _noteSizes[key];
+  var px = known ?? box.height * 0.56;
+  TextPainter tp;
+  while (true) {
+    tp = _text(text, hand(px), width: box.width, lines: lines, align: TextAlign.center);
+    if (known != null) break;
+    final fits = !tp.didExceedMaxLines && tp.height <= box.height * 1.1 && widest(px) <= box.width;
+    if (fits || px <= max(5.0, box.height * 0.2)) break;
+    tp.dispose();
+    px -= 0.5;
+  }
+  if (known == null) {
+    if (_noteSizes.length >= 64) _noteSizes.remove(_noteSizes.keys.first);
+    _noteSizes[key] = px;
+  }
+  tp.paint(canvas, Offset(box.left + (box.width - tp.width) / 2, box.center.dy - tp.height / 2));
+  tp.dispose();
+  canvas.restore();
+}
+
+/// The writing sizes that fit, by note size and words.
+final _noteSizes = <String, double>{};
 
 /// Wound tape: nearly black by the hub, its own color further out, a lighter line where the last turns
 /// catch the light, and a dark edge.

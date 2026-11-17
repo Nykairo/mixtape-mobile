@@ -351,6 +351,44 @@ class Account {
     return out;
   }
 
+  /// The pictures on tapes that are about to go up. A picture's name is made from the picture, so a
+  /// name always means the same one: the account is asked which it has, and only the others travel,
+  /// once. [bytesOf] reads one from the phone (null when it isn't here: then it's on the account already,
+  /// from the computer).
+  Future<void> pushPictures(Iterable<String> names, Future<List<int>?> Function(String name) bytesOf) async {
+    final s = session;
+    final want = {
+      for (final n in names)
+        if (picturePattern.hasMatch(n)) n,
+    }.toList()
+      ..sort();
+    if (s == null || want.isEmpty) return;
+    final have = <String>{};
+    for (var k = 0; k < want.length; k += 40) {
+      final part = want.sublist(k, k + 40 > want.length ? want.length : k + 40).join(',');
+      for (final r in await _get('/rest/v1/pictures?owner=eq.${s.uid}&name=in.($part)&select=name')) {
+        have.add('${r['name']}');
+      }
+    }
+    var batch = <Map<String, Object?>>[];
+    var size = 0;
+    for (final name in want) {
+      if (have.contains(name)) continue;
+      final raw = await bytesOf(name);
+      if (raw == null || raw.isEmpty || raw.length > 2000000) continue;
+      final data = base64.encode(raw);
+      if (batch.isNotEmpty && size + data.length > 1500000) {
+        // a slow connection gets them in a few smaller pieces
+        await _put('pictures', batch, 'owner,name', timeout: const Duration(seconds: 60));
+        batch = [];
+        size = 0;
+      }
+      batch.add({'owner': s.uid, 'name': name, 'data': data});
+      size += data.length;
+    }
+    if (batch.isNotEmpty) await _put('pictures', batch, 'owner,name', timeout: const Duration(seconds: 60));
+  }
+
   // ------------------------------------------------------------ friends, listening along and rooms
 
   static const roomWords = {

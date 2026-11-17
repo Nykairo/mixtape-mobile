@@ -25,8 +25,9 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
     private lateinit var context: Context
     private var activity: ActivityPluginBinding? = null
 
-    /** The answer waiting for a picture to be picked (a profile picture). */
+    /** The answer waiting for a picture to be picked, and what it's for ("profile" or "tape"). */
     private var picking: MethodChannel.Result? = null
+    private var pickingFor = "profile"
 
     /** The tape a widget opened Mixtape with, until the app asks for it. */
     private var launched: String? = null
@@ -70,7 +71,8 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
             answer.success(null)
             return true
         }
-        offMain(answer) { ProfilePicture.from(context, uri) }
+        val what = pickingFor
+        offMain(answer) { if (what == "tape") ProfilePicture.forTape(context, uri) else ProfilePicture.from(context, uri) }
         return true
     }
 
@@ -123,6 +125,7 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
                     result.success(null)
                 } else {
                     picking = result
+                    pickingFor = call.argument<String>("for") ?: "profile"
                     val pick = Intent(Intent.ACTION_GET_CONTENT).apply {
                         type = "image/*"
                         addCategory(Intent.CATEGORY_OPENABLE)

@@ -10,13 +10,31 @@ import '../app.dart';
 import '../blend.dart';
 import '../look.dart';
 import '../phone.dart';
+import '../scrobble.dart';
 import 'pages.dart';
 import 'profile_page.dart';
 import 'shell.dart';
 import 'sign_in.dart';
 import 'widgets.dart';
 
-const appVersion = '0.2.0';
+/// ListenBrainz on (a token, checked first) or off.
+Future<void> _listenBrainz(BuildContext context) async {
+  final settings = App.settings;
+  if (settings.listenBrainzToken.isNotEmpty) {
+    settings.setListenBrainz('', '');
+    say(context, 'ListenBrainz is off. What you listen to stays here.');
+    return;
+  }
+  final token = await askText(context, title: 'Your ListenBrainz token', hint: 'from listenbrainz.org/settings', action: 'Connect', max: 80);
+  if (token == null || token.trim().isEmpty || !context.mounted) return;
+  try {
+    final user = await Scrobbler.check(token);
+    settings.setListenBrainz(token, user);
+    if (context.mounted) say(context, 'Scrobbling to ListenBrainz as $user');
+  } on ScrobbleTrouble catch (e) {
+    if (context.mounted) say(context, e.why);
+  }
+}
 
 /// 3.4 MB, 1.2 GB: how much room the saved songs take.
 String sizeWords(int bytes) {
@@ -156,6 +174,32 @@ class SettingsPage extends StatelessWidget {
                 title: Text('Take them all off the phone', style: Look.ui(15.5)),
                 onTap: () => _clearSaved(context),
               ),
+            const SectionTitle('ListenBrainz and Last.fm'),
+            ListTile(
+              leading: const Icon(Icons.graphic_eq_rounded, color: Look.muted),
+              title: Text(App.settings.listenBrainzUser.isEmpty ? 'Send what I listen to ListenBrainz' : 'Scrobbling to ListenBrainz',
+                  style: Look.ui(15.5)),
+              subtitle: Text(
+                  App.settings.listenBrainzUser.isEmpty
+                      ? 'Your token from listenbrainz.org/settings. Friends there see what plays here and can listen along.'
+                      : 'As ${App.settings.listenBrainzUser}. Tap to stop.',
+                  style: Look.ui(13, color: Look.muted, height: 1.35)),
+              onTap: () => _listenBrainz(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.vpn_key_outlined, color: Look.muted),
+              title: Text('Last.fm API key', style: Look.ui(15.5)),
+              subtitle: Text(
+                  App.settings.lastFmKey.isEmpty
+                      ? 'For listening along with people on Last.fm. A free one comes from last.fm/api.'
+                      : 'Set. Tap to change it.',
+                  style: Look.ui(13, color: Look.muted, height: 1.35)),
+              onTap: () async {
+                final key = await askText(context,
+                    title: 'Last.fm API key', hint: '32 letters and digits', start: App.settings.lastFmKey, action: 'Keep', max: 64, blank: true);
+                if (key != null) App.settings.setLastFmKey(key);
+              },
+            ),
             const SectionTitle('Mixtape Account'),
             if (s == null)
               ListTile(

@@ -3,6 +3,7 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/services.dart';
 
@@ -89,6 +90,23 @@ class MixtapeNative {
     } on MissingPluginException {
       return null;
     } on PlatformException {
+      return null;
+    }
+  }
+
+  /// A photo picked from the phone for a tape: at most 640 pixels long, a JPEG (or a PNG when it has
+  /// see-through parts), as (bytes, png). Null when nothing was picked, or where there's no picker.
+  static Future<(List<int>, bool)?> pickTapePhoto() async {
+    try {
+      final got = await _channel.invokeMethod<Map<Object?, Object?>>('pickPicture', {'for': 'tape'});
+      final data = got?['data'];
+      if (data is! String) return null;
+      return (base64Decode(data), got?['png'] == true);
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    } on FormatException {
       return null;
     }
   }
