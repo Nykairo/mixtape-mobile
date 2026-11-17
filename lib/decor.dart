@@ -871,6 +871,32 @@ Future<Uint8List?> layerPng(List<Map<String, Object?>> items, {Map<String, ui.Im
   return null;
 }
 
+/// [layerPng] for decorations that came without their picture (from a library file): the photos are
+/// read first, by [read] (a picture's name to its bytes, null when it isn't there: an empty frame).
+Future<Uint8List?> layerPngReading(List<Map<String, Object?>> items, Future<List<int>?> Function(String name) read) async {
+  final pictures = <String, ui.Image>{};
+  try {
+    for (final name in picturesOf(items)) {
+      final raw = await read(name);
+      if (raw == null) continue;
+      ui.Codec? codec;
+      try {
+        codec = await ui.instantiateImageCodec(raw is Uint8List ? raw : Uint8List.fromList(raw));
+        pictures[name] = (await codec.getNextFrame()).image;
+      } on Object {
+        // not a picture after all: an empty frame
+      } finally {
+        codec?.dispose();
+      }
+    }
+    return await layerPng(items, pictures: pictures);
+  } finally {
+    for (final img in pictures.values) {
+      img.dispose();
+    }
+  }
+}
+
 /// A sticker on its own, fitted into [box] (for the sticker sheet and the studio's buttons).
 void paintStickerIn(Canvas canvas, Rect box, String shape, {Object? color, String finish = 'gloss'}) {
   final sheet = StickerSheet.the;

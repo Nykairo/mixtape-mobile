@@ -5,6 +5,7 @@ library;
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:mixtape_native/mixtape_native.dart';
 
 import '../app.dart';
 import '../blend.dart';
@@ -16,6 +17,37 @@ import 'profile_page.dart';
 import 'shell.dart';
 import 'sign_in.dart';
 import 'widgets.dart';
+
+/// The library into a file, handed to the share sheet (to the files, a chat, or the computer).
+Future<void> _saveLibrary(BuildContext context) async {
+  try {
+    final f = await App.library.exportFile();
+    final shared = await MixtapeNative.shareFile(f.path, mime: 'application/json', text: 'My Mixtape library');
+    if (!shared && context.mounted) say(context, 'This phone has no way to send the file on');
+  } on FileSystemException {
+    if (context.mounted) say(context, "The phone is full: the library didn't fit in a file");
+  }
+}
+
+/// A library file from the phone's files, taken in next to what's here.
+Future<void> _takeInLibrary(BuildContext context) async {
+  final path = await MixtapeNative.pickFile();
+  if (path == null || !context.mounted) return;
+  say(context, 'Taking it in…');
+  try {
+    final (likes, tapes) = await App.library.importFile(path);
+    if (!context.mounted) return;
+    say(context, likes == 0 && tapes == 0
+        ? 'Everything in it is here already'
+        : 'In: ${count(likes, 'liked song')} and ${count(tapes, 'tape')}');
+  } on FormatException {
+    if (context.mounted) say(context, "That isn't a Mixtape library");
+  } on FileSystemException {
+    if (context.mounted) say(context, "That file couldn't be read");
+  } finally {
+    File(path).delete().ignore(); // the picker's copy of it
+  }
+}
 
 /// ListenBrainz on (a token, checked first) or off.
 Future<void> _listenBrainz(BuildContext context) async {
@@ -174,6 +206,26 @@ class SettingsPage extends StatelessWidget {
                 title: Text('Take them all off the phone', style: Look.ui(15.5)),
                 onTap: () => _clearSaved(context),
               ),
+            const SectionTitle('Your library in a file'),
+            ListTile(
+              leading: const Icon(Icons.ios_share_rounded, color: Look.muted),
+              title: Text('Save it to a file', style: Look.ui(15.5)),
+              subtitle: Text(
+                'Liked songs and tapes with their notes and decorations, for another phone or the computer '
+                '(Ctrl+I there).',
+                style: Look.ui(13, color: Look.muted, height: 1.35),
+              ),
+              onTap: () => _saveLibrary(context),
+            ),
+            ListTile(
+              leading: const Icon(Icons.file_open_outlined, color: Look.muted),
+              title: Text('Take one in', style: Look.ui(15.5)),
+              subtitle: Text(
+                "A library file from the computer (Ctrl+E there) or another phone. What's here stays as it is.",
+                style: Look.ui(13, color: Look.muted, height: 1.35),
+              ),
+              onTap: () => _takeInLibrary(context),
+            ),
             const SectionTitle('ListenBrainz and Last.fm'),
             ListTile(
               leading: const Icon(Icons.graphic_eq_rounded, color: Look.muted),

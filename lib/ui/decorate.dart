@@ -1021,7 +1021,7 @@ class _Tool extends StatelessWidget {
                     : CustomPaint(painter: _ToolPicture(kind, sheet)),
               ),
               const SizedBox(height: 5),
-              Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(12.5, weight: FontWeight.w600)),
+              FittedBox(fit: BoxFit.scaleDown, child: Text(name, maxLines: 1, style: Look.ui(12.5, weight: FontWeight.w600))),
             ]),
           ),
         ),
@@ -1441,12 +1441,14 @@ class _Sheet extends StatelessWidget {
     }
     final all = drawers.fold<int>(0, (n, d) => n + d.$2.length);
     return SafeArea(
-      child: LayoutBuilder(builder: (context, box) => _drawers(box.maxWidth, drawers, start, all)),
+      child: LayoutBuilder(
+        builder: (context, box) => SingleChildScrollView(child: _drawers(box.maxWidth, drawers, start, all)),
+      ),
     );
   }
 
   Widget _drawers(double width, List<(String, List<String>)> drawers, int start, int all) {
-    final cols = width >= 560 ? 8 : (width >= 380 ? 5 : 4);
+    final cols = width >= 560 ? 8 : 5;
     final rows = (drawers.fold<int>(0, (n, d) => max(n, d.$2.length)) / cols).ceil();
     final cell = (width - 42) / cols; // the paper's padding and the grid's own
     return DefaultTabController(

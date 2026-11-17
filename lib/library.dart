@@ -3,13 +3,14 @@
 library;
 
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
 import 'account.dart';
-import 'decor.dart' show picturesOf;
+import 'decor.dart' show cleanItems, layerPngReading, picturesOf;
 import 'model.dart';
 import 'store.dart';
 
@@ -534,6 +535,164 @@ class Library extends ChangeNotifier {
       await tmp.rename(f.path);
     }
     return name;
+  }
+
+  // ------------------------------------------------------------ the whole library in one file
+
+  /// A song as it plays anywhere else (the computer, another phone); null for a file on this phone.
+  static Map<String, Object?>? _portable(Track t) {
+    if (!const {'yt', 'sc', 'pod'}.contains(t.src)) return null;
+    final j = t.toJson();
+    return {
+      for (final k in const ['id', 'src', 'ref', 'title', 'artist', 'album', 'art', 'dur', 'album_id', 'artist_id'])
+        if (j[k] != null && j[k] != '') k: j[k],
+    };
+  }
+
+  /// The whole library in one file, the computer's mixtape-library.json (core.export_library there):
+  /// the liked songs, the tapes with their notes, label papers and decorations, and the pictures on
+  /// them. The computer takes it in with Ctrl+I, another phone in Settings.
+  Future<Map<String, Object?>> exportLibrary() async {
+    final playlists = <String, Object?>{};
+    final notes = <String, String>{};
+    final papers = <String, int>{};
+    final designs = <String, Object?>{};
+    final pictures = <String, String>{};
+    for (final t in shownTapes) {
+      playlists[t.name] = [
+        for (final s in t.songs)
+          if (_portable(s) case final j?) j,
+      ];
+      if (t.note.isNotEmpty) notes[t.name] = t.note;
+      if (t.paper case final int paper) papers[t.name] = paper;
+      final design = t.design;
+      if (design == null || design.isEmpty) continue;
+      designs[t.name] = {
+        for (final e in design.entries)
+          if (e.key != 'layer') e.key: e.value, // the phones' own picture of it; the file has what it's made of
+      };
+      for (final name in picturesOf(design['items'])) {
+        final f = havePicture(name);
+        if (f == null || pictures.containsKey(name)) continue;
+        try {
+          pictures[name] = base64.encode(await f.readAsBytes());
+        } on FileSystemException {
+          continue; // the tape goes without that photo
+        }
+      }
+    }
+    return {
+      'liked': [
+        for (final s in liked)
+          if (_portable(s) case final j?) j,
+      ],
+      'playlists': playlists,
+      'notes': notes,
+      'papers': papers,
+      'designs': designs,
+      if (pictures.isNotEmpty) 'sticker_images': pictures,
+    };
+  }
+
+  /// The library written into a file, to send off with the share sheet (see exportLibrary).
+  Future<File> exportFile() async {
+    final text = await compute(jsonEncode, await exportLibrary());
+    final f = Store.the.file('export/mixtape-library.json');
+    await f.parent.create(recursive: true);
+    await f.writeAsString(text, flush: true);
+    return f;
+  }
+
+  /// Takes in a library file picked on the phone (see importLibrary).
+  Future<(int, int)> importFile(String path) async {
+    final f = File(path);
+    // the computer's files stay well under this even with photos on every tape
+    if (await f.length() > 64 << 20) throw const FormatException("That's far too big for a Mixtape library");
+    final text = await f.readAsString();
+    return importLibrary(await compute(jsonDecode, text));
+  }
+
+  /// Takes in a library file (the computer's or a phone's) the way the computer does: the liked songs
+  /// not liked here yet, the tapes whose names aren't taken, and notes, label papers and decorations
+  /// for tapes that have none of their own. Nothing here is changed or lost. Returns how many liked
+  /// songs and how many tapes came in; a FormatException when it isn't a library at all.
+  Future<(int, int)> importLibrary(Object? raw) async {
+    if (raw is! Map || (raw['liked'] is! List && raw['playlists'] is! Map)) {
+      throw const FormatException("That isn't a Mixtape library");
+    }
+    var likes = 0;
+    for (final j in raw['liked'] is List ? raw['liked'] as List : const []) {
+      final t = Track.fromJson(j);
+      if (t == null || !_likedIds.add(t.id)) continue;
+      liked.add(t);
+      likes++;
+    }
+    if (likes > 0) {
+      _likedChanged = true;
+      _saveSync.soon();
+    }
+    final came = <Tape>[];
+    final lists = raw['playlists'] is Map ? raw['playlists'] as Map : const {};
+    for (final MapEntry(:key, :value) in lists.entries) {
+      final name = '$key'.trim();
+      if (name.isEmpty || tapes.containsKey(name) || value is! List) continue;
+      final tape = Tape(name: name, songs: [
+        for (final j in value)
+          if (Track.fromJson(j) case final t?) t,
+      ]);
+      tapes[name] = tape;
+      came.add(tape);
+    }
+    final notes = raw['notes'] is Map ? raw['notes'] as Map : const {};
+    final papers = raw['papers'] is Map ? raw['papers'] as Map : const {};
+    final designs = raw['designs'] is Map ? raw['designs'] as Map : const {};
+    final decorated = <Tape>[];
+    for (final t in tapes.values) {
+      if (notes[t.name] case final String note when t.note.isEmpty && note.trim().isNotEmpty) t.note = note.trim();
+      if (papers[t.name] case final int paper when t.paper == null && paper >= 0 && paper < 64) t.paper = paper;
+      if (designs[t.name] case final Map design when t.design == null) {
+        final d = <String, Object?>{
+          for (final e in design.entries)
+            if (e.key != 'layer') '${e.key}': e.value,
+        };
+        final items = cleanItems(d['items']);
+        if (items.isEmpty) {
+          d.remove('items');
+        } else {
+          d['items'] = items;
+          decorated.add(t);
+        }
+        t.design = d;
+      }
+    }
+    // the pictures on the tapes, under the names the decorations know them by
+    final pictures = raw['sticker_images'] is Map ? raw['sticker_images'] as Map : const {};
+    for (final MapEntry(:key, :value) in pictures.entries) {
+      final name = '$key';
+      if (!picturePattern.hasMatch(name) || value is! String || havePicture(name) != null) continue;
+      try {
+        final f = Store.the.file('pictures/$name');
+        await f.parent.create(recursive: true);
+        await f.writeAsBytes(base64.decode(value), flush: true);
+      } on Object {
+        continue; // a broken one: that photo shows as an empty frame
+      }
+    }
+    // and the picture of each one's decorations, which the phones lay over the cassette
+    for (final t in decorated) {
+      final items = cleanItems(t.design?['items']);
+      try {
+        final png = await layerPngReading(items, (name) async {
+          final f = havePicture(name);
+          return f == null ? null : await f.readAsBytes();
+        });
+        if (png != null) t.design = {...?t.design, 'layer': await keepLayer(png)};
+      } on Object {
+        continue; // drawn when the tape studio opens it
+      }
+    }
+    if (likes > 0 || came.isNotEmpty || decorated.isNotEmpty) _changed();
+    return (likes, came.length);
   }
 
   /// A picture from the tapes' decorations, if it's on the phone.
