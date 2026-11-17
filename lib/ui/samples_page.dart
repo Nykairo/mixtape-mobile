@@ -91,8 +91,8 @@ class _SamplesPageState extends State<SamplesPage> {
         return Scaffold(
           backgroundColor: Colors.black,
           body: Stack(children: [
-            Positioned.fill(
-              bottom: tabs,
+            Padding(
+              padding: EdgeInsets.only(bottom: tabs),
               child: MediaQuery.removePadding(
                 context: context,
                 removeBottom: true,
@@ -267,6 +267,7 @@ class _SampleCard extends StatelessWidget {
             Expanded(
               child: LayoutBuilder(builder: (context, room) {
                 final side = min(room.maxWidth, room.maxHeight);
+                if (side < 32) return const SizedBox.shrink(); // a window too small for a cover
                 return Center(
                   child: AnimatedScale(
                     scale: here && !feed.paused ? 1 : 0.92,
