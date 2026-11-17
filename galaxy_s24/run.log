@@ -1,0 +1,29 @@
+
+::group::✅ Passing tests
+✅ Home
+✅ Search
+✅ Artist and album
+✅ Library
+✅ Tapes
+✅ Menus and the tape studio
+✅ Stats and Rewind
+✅ Settings and signing in
+✅ Together
+✅ Profiles
+✅ Together, signed out
+✅ Samples
+✅ The player
+✅ The player's sheets
+::endgroup::
+::group::✅ (tearDownAll)
+7 problems on galaxy_s24
+  artist_2: buttons "" and "One More Time (Radio Edit)" lie on each other
+  artist_2: buttons "" and "One More Time (Radio Edit)" lie on each other
+  artist_2: buttons "" and "One More Time (Radio Edit)" lie on each other
+  artist_2: buttons "" and "One More Time (Radio Edit)" lie on each other
+  settings_3: "Open source (GPL 3). Songs com…" lies on ""
+  settings_3: "Open source (GPL 3). Songs com…" lies on "󰄽"
+  settings_3: "Open source (GPL 3). Songs com…" lies on ""
+::endgroup::
+
+🎉 14 tests passed.

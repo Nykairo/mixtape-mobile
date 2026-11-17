@@ -1,0 +1,24 @@
+
+::group::✅ Passing tests
+✅ Home
+✅ Search
+✅ Artist and album
+✅ Library
+✅ Tapes
+✅ Menus and the tape studio
+✅ Stats and Rewind
+✅ Settings and signing in
+✅ Together
+✅ Profiles
+✅ Together, signed out
+✅ Samples
+✅ The player
+✅ The player's sheets
+::endgroup::
+::group::✅ (tearDownAll)
+2 problems on galaxy_a55
+  artist_3: "" lies on "󰄽"
+  artist_3: "" lies on ""
+::endgroup::
+
+🎉 14 tests passed.

@@ -1,0 +1,26 @@
+
+::group::✅ Passing tests
+✅ Home
+✅ Search
+✅ Artist and album
+✅ Library
+✅ Tapes
+✅ Menus and the tape studio
+✅ Stats and Rewind
+✅ Settings and signing in
+✅ Together
+✅ Profiles
+✅ Together, signed out
+✅ Samples
+✅ The player
+✅ The player's sheets
+::endgroup::
+::group::✅ (tearDownAll)
+4 problems on tablet
+  tape_2: buttons "" and "GestureDetector" lie on each other
+  tape_2: buttons "" and "GestureDetector" lie on each other
+  tape_2: buttons "" and "GestureDetector" lie on each other
+  tape_2: buttons "" and "GestureDetector" lie on each other
+::endgroup::
+
+🎉 14 tests passed.

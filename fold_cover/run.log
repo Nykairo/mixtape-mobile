@@ -1,0 +1,26 @@
+
+::group::✅ Passing tests
+✅ Home
+✅ Search
+✅ Artist and album
+✅ Library
+✅ Tapes
+✅ Menus and the tape studio
+✅ Stats and Rewind
+✅ Settings and signing in
+✅ Together
+✅ Profiles
+✅ Together, signed out
+✅ Samples
+✅ The player
+✅ The player's sheets
+::endgroup::
+::group::✅ (tearDownAll)
+4 problems on fold_cover
+  artist_2: buttons "" and "Around the World" lie on each other
+  artist_2: buttons "" and "Around the World" lie on each other
+  artist_2: buttons "" and "Around the World" lie on each other
+  artist_2: buttons "" and "Around the World" lie on each other
+::endgroup::
+
+🎉 14 tests passed.
