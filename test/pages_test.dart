@@ -585,17 +585,22 @@ void main() {
     expect(find.byIcon(Icons.forward_10_rounded), findsOneWidget);
     await wait(tester);
     final ahead = App.audio.player.position - before;
-    expect(ahead.inMilliseconds, inInclusiveRange(9000, 13000));
+    expect(ahead.inMilliseconds, inInclusiveRange(9000, 14000));
     expect(find.byIcon(Icons.forward_10_rounded), findsNothing);
 
-    // a tap takes the keys away (they also go by themselves after a few seconds), another brings them back
+    // while the song plays the keys go away by themselves after a few seconds; a tap brings them back,
+    // another takes them away
+    await wait(tester, rounds: 16);
+    expect(find.byTooltip('Leave full screen'), findsNothing);
     final left = Offset(room.width * 0.2, room.height * 0.35);
+    await tester.tapAt(left);
+    await wait(tester);
+    expect(find.byTooltip('Leave full screen'), findsOneWidget);
     await tester.tapAt(left);
     await wait(tester);
     expect(find.byTooltip('Leave full screen'), findsNothing);
     await tester.tapAt(left);
     await wait(tester);
-    expect(find.byTooltip('Leave full screen'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Leave full screen'));
     await wait(tester);

@@ -114,7 +114,8 @@ class _FullVideoState extends State<FullVideo> {
               if (c != null && c.value.isInitialized) {
                 return Center(child: AspectRatio(aspectRatio: c.value.aspectRatio, child: VideoPlayer(c)));
               }
-              return Center(child: VideoWords(state: now.state));
+              // above the middle, where the song's keys don't cover it
+              return Align(alignment: const Alignment(0, -0.42), child: VideoWords(state: now.state));
             },
           ),
         ),
