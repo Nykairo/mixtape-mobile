@@ -7,9 +7,24 @@ set -euo pipefail
 
 notes="Built from ${GITHUB_REF_NAME} at ${GITHUB_SHA::7}. A draft only you can see; the next test build replaces it."
 
+# files of the same kind (.apk, .ipa) from an older version go first, so the draft holds the newest
+tidy() {
+  local keep=" " kinds=" "
+  for f in "$@"; do
+    keep+="$(basename "$f") "
+    kinds+="${f##*.} "
+  done
+  for old in $(gh release view test-build --json assets --jq '.assets[].name' 2>/dev/null || true); do
+    case "$kinds" in *" ${old##*.} "*) ;; *) continue ;; esac
+    case "$keep" in *" $old "*) continue ;; esac
+    gh release delete-asset test-build "$old" -y >/dev/null || true
+  done
+}
+
 # the Android and the iPhone build can both get here at once: whoever comes second adds to it
 for attempt in 1 2 3 4 5; do
   if gh release view test-build >/dev/null 2>&1; then
+    tidy "$@"
     gh release edit test-build --target "$GITHUB_SHA" --notes "$notes" >/dev/null &&
       gh release upload test-build "$@" --clobber && exit 0
   else
