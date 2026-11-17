@@ -16,6 +16,7 @@ import 'home_widgets.dart';
 import 'library.dart';
 import 'look.dart';
 import 'phone.dart';
+import 'scrobble.dart';
 import 'settings.dart';
 import 'store.dart';
 import 'together.dart';
@@ -61,8 +62,15 @@ Future<void> main() async {
     audio.autoplay = settings.autoplay;
     audio.setCrossfade(settings.crossfade, shape: settings.fadeShape, albums: settings.albumsWhole);
   });
-  audio.onPlayed = library.played;
-  audio.onHeard = history.heard;
+  final scrobbler = Scrobbler(settings, version: appVersion);
+  audio.onPlayed = (t) {
+    library.played(t);
+    scrobbler.playingNow(t, pos: audio.player.position.inMilliseconds / 1000);
+  };
+  audio.onHeard = (t, seconds, started) {
+    history.heard(t, seconds, started);
+    scrobbler.heard(t, seconds, started);
+  };
   audio.unwanted = library.isHidden;
   App.audio = audio;
   App.library = library;

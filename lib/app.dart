@@ -12,6 +12,9 @@ import 'samples.dart';
 import 'settings.dart';
 import 'together.dart';
 
+/// This version of the phone app (pubspec.yaml's, for what the app says about itself).
+const appVersion = '0.3.0';
+
 class App {
   static late MixtapeAudio audio;
   static late Library library;

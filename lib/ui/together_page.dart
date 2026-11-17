@@ -16,6 +16,7 @@ import '../app.dart';
 import '../look.dart';
 import '../model.dart';
 import '../rooms.dart' as rooms;
+import '../scrobble.dart';
 import '../together.dart';
 import 'profile_page.dart';
 import 'shell.dart';
@@ -149,15 +150,26 @@ class _TogetherPageState extends State<TogetherPage> {
       await action();
     } on AccountError catch (e) {
       if (mounted) say(context, e.message);
+    } on ScrobbleTrouble catch (e) {
+      if (mounted) say(context, e.why);
+    } on Object {
+      if (mounted) say(context, AccountError('offline').message);
     } finally {
       if (mounted) setState(() => _busy = '');
     }
   }
 
+  /// Whom to listen along with: a Mixtape Account, or somebody on ListenBrainz or Last.fm.
+  String _service = 'mixtape';
+
   Future<void> _along() => _do('along', () async {
         final name = _friend.text.trim();
         if (name.isEmpty) return;
-        await App.together.listenAlong(name);
+        if (_service == 'mixtape') {
+          await App.together.listenAlong(name);
+        } else {
+          await App.together.listenAlongOutside(_service, name, lastFmKey: App.settings.lastFmKey);
+        }
         _friend.clear();
       });
 
@@ -282,13 +294,33 @@ class _TogetherPageState extends State<TogetherPage> {
         _Door(
           icon: Icons.headphones_rounded,
           title: 'Listen along',
-          words: 'What a friend plays, here, at the same second. All you need is their user name.',
-          child: Row(children: [
-            Expanded(
-              child: _Field(controller: _friend, hint: 'user name', icon: Icons.alternate_email_rounded, onGo: _along),
-            ),
-            const SizedBox(width: 10),
-            _Go('Listen', busy: _busy == 'along', onTap: _along),
+          words: _service == 'mixtape'
+              ? 'What a friend plays, here, at the same second. All you need is their user name.'
+              : 'Friends on Spotify, YouTube Music or anything else that sends their music to '
+                  '${_service == 'lastfm' ? 'Last.fm' : 'ListenBrainz'}: each song they play plays here.',
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Wrap(spacing: 8, children: [
+              for (final (key, label) in const [('mixtape', 'Mixtape'), ('listenbrainz', 'ListenBrainz'), ('lastfm', 'Last.fm')])
+                ChoiceChip(
+                  label: Text(label),
+                  selected: _service == key,
+                  showCheckmark: false,
+                  labelStyle: Look.ui(13, weight: FontWeight.w600, color: _service == key ? Look.bg : Look.cream),
+                  selectedColor: Look.cream,
+                  backgroundColor: Look.bg,
+                  side: BorderSide.none,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                  onSelected: (_) => setState(() => _service = key),
+                ),
+            ]),
+            const SizedBox(height: 10),
+            Row(children: [
+              Expanded(
+                child: _Field(controller: _friend, hint: 'user name', icon: Icons.alternate_email_rounded, onGo: _along),
+              ),
+              const SizedBox(width: 10),
+              _Go('Listen', busy: _busy == 'along', onTap: _along),
+            ]),
           ]),
         ),
         _Door(

@@ -15,11 +15,13 @@ import 'package:just_audio/just_audio.dart';
 
 import 'account.dart';
 import 'audio.dart';
+import 'importer.dart';
 import 'jsonwalk.dart';
 import 'model.dart';
 import 'realtime.dart';
 import 'rooms.dart' as rooms;
 import 'rooms.dart' show RoomState;
+import 'scrobble.dart';
 
 /// A song as it travels to other phones and computers: only what playing and showing it takes, or null
 /// for a song that can't play anywhere else.
@@ -149,6 +151,63 @@ class Together extends ChangeNotifier {
     final pos = playing ? pos0 + max(0.0, now() - at) * speed : pos0;
     audio.followSong(t, Duration(milliseconds: (pos * 1000).round()),
         playing: playing, rate: speed, from: 'With $friendName');
+    notifyListeners();
+  }
+
+  /// Listens along with somebody on ListenBrainz ('listenbrainz') or Last.fm ('lastfm'), whatever
+  /// they play it with: each song is found on YouTube Music (or is the very video, when their player is
+  /// Mixtape) and plays here, from where they are in it when that's known.
+  Future<void> listenAlongOutside(String service, String user, {String lastFmKey = ''}) async {
+    final name = user.trim();
+    if (name.isEmpty) return;
+    final first = await _outsideNow(service, name, lastFmKey); // a wrong name stops here
+    await leaveRoom();
+    stopAlong();
+    friend = '$service:$name';
+    friendName = '$name on ${service == 'lastfm' ? 'Last.fm' : 'ListenBrainz'}';
+    _outsideKey = '';
+    audio.steer = steer;
+    notifyListeners();
+    await _outsideIs(first);
+    _friendPoll = Timer.periodic(const Duration(seconds: 6), (_) async {
+      try {
+        await _outsideIs(await _outsideNow(service, name, lastFmKey));
+      } on Object {
+        // offline for a moment, or the service is: the next try
+      }
+    });
+  }
+
+  /// What was last looked up for an outside friend, so one song isn't looked up twice.
+  String _outsideKey = '';
+
+  static Future<OutsideSong?> _outsideNow(String service, String name, String key) =>
+      service == 'lastfm' ? Scrobbler.lastFmNow(name, key) : Scrobbler.listenBrainzNow(name);
+
+  Future<void> _outsideIs(OutsideSong? s) async {
+    final who = friendName.split(' on ').first;
+    if (!friend.contains(':')) return;
+    if (s == null || s.title.isEmpty) {
+      if (friendNow != null) notices.add("$who isn't playing anything right now");
+      friendNow = null;
+      _outsideKey = '';
+      notifyListeners();
+      return;
+    }
+    final key = '${s.title}|${s.artist}|${s.started}';
+    if (key == _outsideKey) return;
+    _outsideKey = key;
+    final t = s.video.isNotEmpty
+        ? Track(src: 'yt', ref: s.video, title: s.title, artist: s.artist, dur: s.dur)
+        : await Importer.locate((title: s.title, artist: s.artist, dur: s.dur));
+    if (!friend.contains(':') || key != _outsideKey) return; // they moved on meanwhile, or this stopped
+    if (t == null) {
+      notices.add("${s.title} isn't on YouTube Music, so it can't play along here");
+      return;
+    }
+    final pos = s.started > 0 ? max(0.0, DateTime.now().millisecondsSinceEpoch / 1000 - s.started) : 0.0;
+    friendNow = {...t.toJson(), 'playing': true};
+    audio.followSong(t, Duration(milliseconds: (pos * 1000).round()), playing: true, from: 'With $who');
     notifyListeners();
   }
 
@@ -565,7 +624,7 @@ class Together extends ChangeNotifier {
       return false;
     }
     if (!canSteer) {
-      notices.add('Only the host steers a party. Find a song and ask for it.');
+      notices.add('Only the host and the DJs steer a party. Find a song and ask for it.');
       return true;
     }
     final it = rooms.currentOf(state);

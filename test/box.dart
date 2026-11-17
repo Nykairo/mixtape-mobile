@@ -15,6 +15,7 @@ import 'package:http/testing.dart';
 import 'package:mixtape/account.dart';
 import 'package:mixtape/app.dart';
 import 'package:mixtape/audio.dart';
+import 'package:mixtape/decor.dart';
 import 'package:mixtape/downloads.dart';
 import 'package:mixtape/history.dart';
 import 'package:mixtape/innertube.dart';
@@ -94,8 +95,23 @@ class FakeAccount extends Account {
           if (known[id] case final Map<String, Object?> p) id: p,
       };
 
+  /// The pictures on the account's tapes, by name.
+  final pictures = <String, List<int>>{};
+
   @override
-  Future<Map<String, List<int>>> pullPictures(Iterable<String> names) async => {};
+  Future<Map<String, List<int>>> pullPictures(Iterable<String> names) async => {
+        for (final n in names)
+          if (pictures[n] case final List<int> raw) n: raw,
+      };
+
+  @override
+  Future<void> pushPictures(Iterable<String> names, Future<List<int>?> Function(String name) bytesOf) async {
+    for (final n in names) {
+      if (pictures.containsKey(n)) continue;
+      final raw = await bytesOf(n);
+      if (raw != null) pictures[n] = raw;
+    }
+  }
 
   /// Profiles by user name, and what was saved to this account's own.
   Map<String, Map<String, Object?>> cards = {};
@@ -268,12 +284,38 @@ class Box {
 
   static bool _open = false;
 
+  /// What the computer stuck on Night drive: a bit of everything the studio has.
+  static final decorations = <Map<String, Object?>>[
+    {'kind': 'washi', 'x': 0.5, 'y': 0.04, 's': 0.38, 'rot': -3.0, 'pattern': 'dots', 'color': 'mint'},
+    {'kind': 'sticker', 'shape': 'star', 'x': 0.88, 'y': 0.18, 's': 0.12, 'rot': 12.0, 'finish': 'holo'},
+    {'kind': 'sticker', 'shape': 'heart', 'x': 0.1, 'y': 0.86, 's': 0.11, 'rot': -10.0, 'color': 'pink'},
+    {'kind': 'sticker', 'shape': 'hifi', 'x': 0.86, 'y': 0.88, 's': 0.15, 'rot': 6.0, 'finish': 'glitter'},
+    {'kind': 'dymo', 'text': 'night', 'x': 0.5, 'y': 0.74, 's': 0.066, 'rot': -2.0, 'color': 'blue'},
+    {
+      'kind': 'ink',
+      'x': 0.3,
+      'y': 0.9,
+      's': 1.0,
+      'rot': 0.0,
+      'w': 0.0095,
+      'color': 'white',
+      'pts': [
+        [-0.06, 0.0],
+        [-0.03, -0.02],
+        [0.0, 0.0],
+        [0.03, -0.02],
+        [0.06, 0.0],
+      ],
+    },
+  ];
+
   /// Sets the app up once: call it from setUpAll.
   static Future<void> open() async {
     if (_open) return;
     _open = true;
     TestWidgetsFlutterBinding.ensureInitialized();
     quietPlugins();
+    await StickerSheet.load();
     if (pictures) HttpOverrides.global = null; // the real internet, for the covers
     final dir = Directory.systemTemp.createTempSync('mixtape-box');
     await Store.open(at: dir);
@@ -293,6 +335,7 @@ class Box {
       library.newTape('Night drive', songs: songs.skip(4).take(6).toList()),
       {'shell': 'clear', 'finish': 'glitter', 'tape': 'chrome', 'pen': 'marker'},
       paper: 7,
+      items: [for (final it in decorations) Map.of(it)],
     );
     library.setDesign(
       library.newTape('Gym', songs: songs.skip(9).take(5).toList()),

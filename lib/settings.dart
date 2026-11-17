@@ -19,6 +19,12 @@ class Settings extends ChangeNotifier {
   /// Friends with a Mixtape Account can listen along with what plays here.
   bool shareListening = true;
 
+  /// ListenBrainz: the token that sends what you listen to (scrobbling) and the name it belongs to;
+  /// and a Last.fm API key, for listening along with people on Last.fm.
+  String listenBrainzToken = '';
+  String listenBrainzUser = '';
+  String lastFmKey = '';
+
   /// Seconds two songs overlap (0: off), the last length that was on (what switching it on brings
   /// back), the shape of the blend, and whether songs of one album run into each other as made.
   double crossfade = 0;
@@ -51,6 +57,9 @@ class Settings extends ChangeNotifier {
         'albums_whole': albumsWhole,
         'lyrics_countdown': lyricsCountdown,
         'rewind_note': rewindNote,
+        'listenbrainz_token': listenBrainzToken,
+        'listenbrainz_user': listenBrainzUser,
+        'lastfm_key': lastFmKey,
         'rewind_seen': rewindSeen,
         'grid': grid,
         'sort': sort,
@@ -71,6 +80,9 @@ class Settings extends ChangeNotifier {
       albumsWhole = j['albums_whole'] != false;
       lyricsCountdown = j['lyrics_countdown'] != false;
       rewindNote = j['rewind_note'] != false;
+      listenBrainzToken = '${j['listenbrainz_token'] ?? ''}';
+      listenBrainzUser = '${j['listenbrainz_user'] ?? ''}';
+      lastFmKey = '${j['lastfm_key'] ?? ''}';
       rewindSeen = '${j['rewind_seen'] ?? ''}';
       grid = j['grid'] == true;
       final order = j['sort'];
@@ -115,6 +127,20 @@ class Settings extends ChangeNotifier {
   void setRewindNote(bool on) {
     if (on == rewindNote) return;
     rewindNote = on;
+    _save.soon();
+    notifyListeners();
+  }
+
+  /// ListenBrainz on (a checked token and its name) or off (both empty).
+  void setListenBrainz(String token, String user) {
+    listenBrainzToken = token.trim();
+    listenBrainzUser = user;
+    _save.soon();
+    notifyListeners();
+  }
+
+  void setLastFmKey(String key) {
+    lastFmKey = key.trim();
     _save.soon();
     notifyListeners();
   }

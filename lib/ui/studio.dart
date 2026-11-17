@@ -1,14 +1,21 @@
 /// The tape studio on the phone: the shell, the label, the reels and the sticky note, picked from the
-/// same materials as on the computer (decor.py there), with the cassette changing as you pick. What the
-/// computer stuck on the tape (stickers, photos, doodles) stays on it; the changes go back to the account.
+/// same materials as on the computer (decor.py there), with the cassette changing as you pick, and
+/// everything stuck and drawn on it (see decorate.dart). The changes go back to the account, so the
+/// computer gets them too.
 library;
+
+import 'dart:async';
+import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/material.dart';
 
 import '../app.dart';
 import '../cassette.dart';
+import '../decor.dart';
 import '../look.dart';
 import '../model.dart';
+import 'decorate.dart';
 import 'widgets.dart';
 
 const _shells = [
@@ -72,7 +79,7 @@ class StudioPage extends StatefulWidget {
   State<StudioPage> createState() => _StudioPageState();
 }
 
-class _StudioPageState extends State<StudioPage> {
+class _StudioPageState extends State<StudioPage> with SingleTickerProviderStateMixin {
   late final Map<String, Object?> _d = {
     for (final e in (widget.tape.design ?? const <String, Object?>{}).entries)
       if (!const {'items', 'layer', 'paper'}.contains(e.key)) e.key: e.value,
@@ -81,212 +88,360 @@ class _StudioPageState extends State<StudioPage> {
       ? widget.tape.design!['paper'] as int
       : (widget.tape.paper ?? slotFor(widget.tape.name));
   late final _note = TextEditingController(text: widget.tape.note);
-  bool _changed = false;
+  late final _tabs = TabController(length: 5, vsync: this);
+  late final _decor = Decorations(cleanItems(widget.tape.design?['items']));
+  late final String _startItems, _startLook; // what the tape had, to know what changed
+
+  // undo and redo: the whole studio as it was after each finished change
+  final _history = <String>[];
+  int _at = 0;
+  late String _saved; // what the tape has: anything else is lost when leaving without Done
+  Timer? _typing;
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startItems = jsonEncode(_decor.items);
+    _startLook = _look();
+    _saved = _snapshot();
+    _history.add(_saved);
+    _decor.onCommit = _commit;
+    _note.addListener(_typed);
+    StickerSheet.load().then((_) {
+      if (mounted) _decor.refresh();
+    }, onError: (Object _) {});
+    _showPictures();
+  }
 
   @override
   void dispose() {
+    _typing?.cancel();
     _note.dispose();
+    _tabs.dispose();
+    _decor.dispose();
     super.dispose();
   }
 
-  void _set(String key, Object? value) => setState(() {
-        _changed = true;
-        if (value == null) {
-          _d.remove(key);
-        } else {
-          _d[key] = value;
-        }
-      });
+  String _look() => jsonEncode({'d': _d, 'paper': _paper});
 
-  void _save() {
+  String _snapshot() => jsonEncode({'d': _d, 'paper': _paper, 'note': _note.text, 'items': _decor.items});
+
+  bool get _dirty => _history[_at] != _saved || (_typing?.isActive ?? false);
+
+  /// A change is finished: it becomes a step undo can go back to.
+  void _commit() {
+    _typing?.cancel();
+    final now = _snapshot();
+    if (now != _history[_at]) {
+      _history.removeRange(_at + 1, _history.length);
+      _history.add(now);
+      if (_history.length > 80) _history.removeAt(0);
+      _at = _history.length - 1;
+    }
+    if (mounted) setState(() {});
+  }
+
+  /// The note's words count as a step once the typing stops for a moment.
+  void _typed() {
+    final was = _typing?.isActive ?? false;
+    _typing?.cancel();
+    _typing = Timer(const Duration(milliseconds: 700), _commit);
+    if (!was && mounted) setState(() {}); // something to lose now: leaving asks first
+  }
+
+  void _restore(String snap) {
+    final j = jsonDecode(snap) as Map<String, Object?>;
+    _note.removeListener(_typed);
+    setState(() {
+      _d
+        ..clear()
+        ..addAll(Map<String, Object?>.from(j['d'] as Map));
+      _paper = (j['paper'] as num).toInt();
+      _note.text = '${j['note'] ?? ''}';
+    });
+    _note.addListener(_typed);
+    _decor.restore([for (final it in j['items'] as List) Map<String, Object?>.from(it as Map)]);
+  }
+
+  void _undo() {
+    _commit(); // what was typed a moment ago counts as a step too
+    if (_at == 0) return;
+    _at--;
+    _restore(_history[_at]);
+  }
+
+  void _redo() {
+    if (_at >= _history.length - 1) return;
+    _at++;
+    _restore(_history[_at]);
+  }
+
+  void _set(String key, Object? value) {
+    setState(() {
+      if (value == null) {
+        _d.remove(key);
+      } else {
+        _d[key] = value;
+      }
+    });
+    _commit();
+  }
+
+  /// The photos on the tape: from the phone, or from the account when the computer stuck them on.
+  Future<void> _showPictures() async {
+    final names = picturesOf(_decor.items);
+    if (names.isEmpty) return;
+    await App.library.fetchPictures(names);
+    for (final n in names) {
+      if (!mounted) return;
+      await _decor.show(n);
+    }
+  }
+
+  bool _noteShows() => _note.text.trim().isNotEmpty && _d['corner_hidden'] != true;
+
+  /// A tap on the tape that found nothing stuck on it: on the corner note, it goes to the note.
+  void _tapped(Offset pos, Geo g) {
+    if (!_noteShows()) return;
+    final (c, side, tilt) = g.sticky(_paper);
+    final a = -tilt * pi / 180;
+    final d = pos - c;
+    final x = d.dx * cos(a) - d.dy * sin(a), y = d.dx * sin(a) + d.dy * cos(a);
+    if (x.abs() <= side / 2 && y.abs() <= side / 2) _tabs.animateTo(4);
+  }
+
+  Future<void> _save() async {
+    if (_saving) return;
+    _commit();
     final lib = App.library;
-    if (_changed) lib.setDesign(widget.tape, Map.of(_d), paper: _paper);
-    if (_note.text.trim() != widget.tape.note) lib.setNote(widget.tape, _note.text);
+    final tape = widget.tape;
+    final items = cleanItems(_decor.items);
+    final stuck = jsonEncode(items) != _startItems;
+    final looked = _look() != _startLook;
+    if (stuck) {
+      setState(() => _saving = true);
+      String? layer;
+      try {
+        await _showPictures(); // a last chance for photos still on their way
+        final png = await layerPng(items, pictures: _decor.pictures);
+        if (png != null) layer = await lib.keepLayer(png);
+      } on Object {
+        layer = null; // the phones show the tape without them until it's drawn again
+      }
+      if (!mounted) return;
+      lib.setDesign(tape, Map.of(_d), paper: _paper, items: items, layer: layer);
+    } else if (looked) {
+      lib.setDesign(tape, Map.of(_d), paper: _paper);
+    }
+    if (_note.text.trim() != tape.note) lib.setNote(tape, _note.text);
+    _saved = _history[_at];
     Navigator.of(context).pop();
-    if (_changed) say(context, App.account.signedIn ? 'Decorated, on the computer too in a moment' : 'Decorated');
+    if (stuck || looked) say(context, App.account.signedIn ? 'Decorated, on the computer too in a moment' : 'Decorated');
+  }
+
+  /// Back: first lets go of what's in hand, then stops the pen, and only then leaves (asking first
+  /// when something would be lost).
+  Future<void> _back() async {
+    if (_saving) return;
+    if (_decor.current != null) {
+      _decor.select(-1);
+      return;
+    }
+    if (_decor.pen) {
+      _decor.setPen(false);
+      return;
+    }
+    _commit();
+    if (!_dirty) {
+      Navigator.of(context).pop();
+      return;
+    }
+    final leave = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (dialog) => AlertDialog(
+        backgroundColor: Look.side,
+        title: Text('Leave without saving?', style: Look.ui(19, weight: FontWeight.w800)),
+        content: Text('The changes to this tape go away. Done keeps them.', style: Look.ui(15, color: Look.muted)),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(dialog).pop(false), child: const Text('Keep working')),
+          FilledButton(onPressed: () => Navigator.of(dialog).pop(true), child: const Text('Leave')),
+        ],
+      ),
+    );
+    if (leave == true && mounted) Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
     final tape = widget.tape;
-    final preview = {..._d, if (tape.design?['layer'] != null) 'layer': tape.design!['layer']};
-    return DefaultTabController(
-      length: 4,
-      child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: Look.bg,
-          surfaceTintColor: Colors.transparent,
-          title: Text('Tape studio', style: Look.ui(19, weight: FontWeight.w800)),
-          actions: [
-            Padding(
-              padding: const EdgeInsets.only(right: 10),
-              child: FilledButton(onPressed: _save, child: const Text('Done')),
+    final page = Scaffold(
+      appBar: AppBar(
+        backgroundColor: Look.bg,
+        surfaceTintColor: Colors.transparent,
+        title: Text('Tape studio', style: Look.ui(19, weight: FontWeight.w800)),
+        actions: [
+          IconButton(
+            tooltip: 'Undo',
+            onPressed: _at > 0 ? _undo : null,
+            icon: const Icon(Icons.undo_rounded),
+          ),
+          IconButton(
+            tooltip: 'Redo',
+            onPressed: _at < _history.length - 1 ? _redo : null,
+            icon: const Icon(Icons.redo_rounded),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 4, right: 10),
+            child: FilledButton(
+              onPressed: _saving ? null : _save,
+              child: _saving
+                  ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2.4))
+                  : const Text('Done'),
             ),
-          ],
-        ),
-        body: SafeArea(
-          top: false,
-          child: Column(children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(36, 8, 36, 14),
-              child: ValueListenableBuilder<TextEditingValue>(
-                valueListenable: _note,
-                builder: (context, note, _) => Cassette(
-                  title: tape.shownName,
-                  slot: _paper,
-                  design: preview,
-                  layer: App.library.layerOf(tape),
-                  sticky: note.text,
-                  leftNote: tapeFor(tape.seconds),
-                  rightNote: count(tape.songs.length),
-                  playing: true,
+          ),
+        ],
+      ),
+      body: SafeArea(
+        top: false,
+        child: Column(children: [
+          LayoutBuilder(builder: (context, box) {
+            // the cassette across the phone, with room around it for the handles; on a tablet or a
+            // phone on its side, small enough to leave room for the panel under it
+            final screen = MediaQuery.sizeOf(context);
+            final cw = min(box.maxWidth - 72, min(560.0, screen.height * 0.4 * ratio));
+            final spot = Rect.fromLTWH((box.maxWidth - cw) / 2, 8, cw, cw / ratio);
+            return SizedBox(
+              height: spot.bottom + 14,
+              child: RepaintBoundary(
+                child: DecorCanvas(
+                  decor: _decor,
+                  box: spot,
+                  onPicked: () => _tabs.animateTo(0),
+                  onWrite: (k) => writeOn(context, _decor, k),
+                  onTapElse: _tapped,
+                  child: ValueListenableBuilder<TextEditingValue>(
+                    valueListenable: _note,
+                    builder: (context, note, _) => Cassette(
+                      title: tape.shownName,
+                      slot: _paper,
+                      design: Map.of(_d),
+                      sticky: note.text,
+                      leftNote: tapeFor(tape.seconds),
+                      rightNote: count(tape.songs.length),
+                      playing: true,
+                    ),
+                  ),
                 ),
               ),
-            ),
-            TabBar(
-              indicatorColor: Look.accent,
-              labelColor: Look.cream,
-              unselectedLabelColor: Look.muted,
-              dividerColor: Look.edge,
-              labelStyle: Look.cond(14, spacing: 1.6),
-              tabs: const [Tab(text: 'SHELL'), Tab(text: 'LABEL'), Tab(text: 'REELS'), Tab(text: 'NOTE')],
-            ),
-            Expanded(
-              child: TabBarView(children: [
-                ListView(padding: const EdgeInsets.all(16), children: [
-                  _Heading('Color'),
-                  _Swatches([
-                    for (final (k, name, c) in _shells)
-                      _Swatch(c, name, (_d['shell'] ?? 'black') == k, () => _set('shell', k == 'black' ? null : k),
-                          see: k == 'clear' || k == 'smoke'),
-                  ]),
-                  _Heading('Finish'),
-                  _Choices([
-                    for (final (k, name) in _finishes)
-                      (name, (_d['finish'] ?? 'matte') == k, () => _set('finish', k == 'matte' ? null : k)),
-                  ]),
-                  _Heading('Screws'),
-                  _Swatches([
-                    for (final (k, name, c) in _screws) _Swatch(c, name, _d['screws'] == k, () => _set('screws', k)),
-                    _Swatch(Look.raised, 'None', _d['screws'] == 'none', () => _set('screws', 'none'), none: true),
-                  ]),
+            );
+          }),
+          TabBar(
+            controller: _tabs,
+            indicatorColor: Look.accent,
+            labelColor: Look.cream,
+            unselectedLabelColor: Look.muted,
+            dividerColor: Look.edge,
+            labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+            labelStyle: Look.cond(14, spacing: 1.6),
+            tabs: const [Tab(text: 'DECOR'), Tab(text: 'SHELL'), Tab(text: 'LABEL'), Tab(text: 'REELS'), Tab(text: 'NOTE')],
+          ),
+          Expanded(
+            child: TabBarView(controller: _tabs, children: [
+              DecorPanel(decor: _decor, noteShows: _noteShows, onUndo: _undo),
+              ListView(padding: const EdgeInsets.all(16), children: [
+                const PanelHeading('Color'),
+                Swatches([
+                  for (final (k, name, c) in _shells)
+                    Swatch(c, name, (_d['shell'] ?? 'black') == k, () => _set('shell', k == 'black' ? null : k),
+                        see: k == 'clear' || k == 'smoke'),
                 ]),
-                ListView(padding: const EdgeInsets.all(16), children: [
-                  _Heading('Paper'),
-                  _Swatches([
-                    for (var k = 0; k < papers.length; k++)
-                      _PaperSwatch(k, _paper == k, () => setState(() {
-                            _paper = k;
-                            _changed = true;
-                          })),
-                  ]),
-                  _Heading('Stripes'),
-                  _Choices([
-                    for (final (k, name) in _stripes)
-                      (name, (_d['stripes'] ?? 'classic') == k, () => _set('stripes', k == 'classic' ? null : k)),
-                  ]),
-                  _Heading('Lettering'),
-                  _Choices([
-                    for (final (k, name) in _pens) (name, (_d['pen'] ?? 'hand') == k, () => _set('pen', k == 'hand' ? null : k)),
-                  ]),
-                  _Heading('Ink'),
-                  _Swatches([
-                    _Swatch(paperFor(_paper).$3, "The paper's own", _d['ink'] == null, () => _set('ink', null)),
-                    for (final (k, name, c) in _inks) _Swatch(c, name, _d['ink'] == k, () => _set('ink', k)),
-                  ]),
+                const PanelHeading('Finish'),
+                Choices([
+                  for (final (k, name) in _finishes)
+                    (name, (_d['finish'] ?? 'matte') == k, () => _set('finish', k == 'matte' ? null : k)),
                 ]),
-                ListView(padding: const EdgeInsets.all(16), children: [
-                  _Heading('Hubs'),
-                  _Swatches([
-                    _Swatch(Look.raised, 'As the shell', _d['hub'] == null, () => _set('hub', null), none: true),
-                    for (final (k, name, c) in _hubs) _Swatch(c, name, _d['hub'] == k, () => _set('hub', k)),
-                  ]),
-                  _Heading('Tape'),
-                  _Swatches([
-                    for (final (k, name, c) in _tapes)
-                      _Swatch(c, name, (_d['tape'] ?? 'brown') == k, () => _set('tape', k == 'brown' ? null : k)),
-                  ]),
-                ]),
-                ListView(padding: const EdgeInsets.all(16), children: [
-                  _Heading('What it says'),
-                  TextField(
-                    controller: _note,
-                    maxLength: 28,
-                    textCapitalization: TextCapitalization.sentences,
-                    decoration: const InputDecoration(hintText: 'A few words for the corner'),
-                  ),
-                  _Heading('Note color'),
-                  _Swatches([
-                    _Swatch(Look.raised, 'As the paper goes', _d['corner_color'] == null, () => _set('corner_color', null), none: true),
-                    for (final (k, c) in _notes) _Swatch(c, k, _d['corner_color'] == k, () => _set('corner_color', k)),
-                  ]),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: _d['corner_hidden'] == true,
-                    activeThumbColor: Look.accent,
-                    title: Text('No sticky note', style: Look.ui(15.5)),
-                    onChanged: (on) => _set('corner_hidden', on ? true : null),
-                  ),
+                const PanelHeading('Screws'),
+                Swatches([
+                  for (final (k, name, c) in _screws) Swatch(c, name, _d['screws'] == k, () => _set('screws', k)),
+                  Swatch(Look.raised, 'None', _d['screws'] == 'none', () => _set('screws', 'none'), none: true),
                 ]),
               ]),
-            ),
-          ]),
-        ),
+              ListView(padding: const EdgeInsets.all(16), children: [
+                const PanelHeading('Paper'),
+                Swatches([
+                  for (var k = 0; k < papers.length; k++)
+                    _PaperSwatch(k, _paper == k, () {
+                      setState(() => _paper = k);
+                      _commit();
+                    }),
+                ]),
+                const PanelHeading('Stripes'),
+                Choices([
+                  for (final (k, name) in _stripes)
+                    (name, (_d['stripes'] ?? 'classic') == k, () => _set('stripes', k == 'classic' ? null : k)),
+                ]),
+                const PanelHeading('Lettering'),
+                Choices([
+                  for (final (k, name) in _pens) (name, (_d['pen'] ?? 'hand') == k, () => _set('pen', k == 'hand' ? null : k)),
+                ]),
+                const PanelHeading('Ink'),
+                Swatches([
+                  Swatch(paperFor(_paper).$3, "The paper's own", _d['ink'] == null, () => _set('ink', null)),
+                  for (final (k, name, c) in _inks) Swatch(c, name, _d['ink'] == k, () => _set('ink', k)),
+                ]),
+              ]),
+              ListView(padding: const EdgeInsets.all(16), children: [
+                const PanelHeading('Hubs'),
+                Swatches([
+                  Swatch(Look.raised, 'As the shell', _d['hub'] == null, () => _set('hub', null), none: true),
+                  for (final (k, name, c) in _hubs) Swatch(c, name, _d['hub'] == k, () => _set('hub', k)),
+                ]),
+                const PanelHeading('Tape'),
+                Swatches([
+                  for (final (k, name, c) in _tapes)
+                    Swatch(c, name, (_d['tape'] ?? 'brown') == k, () => _set('tape', k == 'brown' ? null : k)),
+                ]),
+              ]),
+              ListView(padding: const EdgeInsets.all(16), children: [
+                const PanelHeading('What it says'),
+                TextField(
+                  controller: _note,
+                  maxLength: 28,
+                  textCapitalization: TextCapitalization.sentences,
+                  decoration: const InputDecoration(hintText: 'A few words for the corner'),
+                  onSubmitted: (_) => _commit(),
+                ),
+                const PanelHeading('Note color'),
+                Swatches([
+                  Swatch(Look.raised, 'As the paper goes', _d['corner_color'] == null, () => _set('corner_color', null),
+                      none: true),
+                  for (final (k, c) in _notes) Swatch(c, k, _d['corner_color'] == k, () => _set('corner_color', k)),
+                ]),
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  value: _d['corner_hidden'] == true,
+                  activeThumbColor: Look.accent,
+                  title: Text('No sticky note', style: Look.ui(15.5)),
+                  onChanged: (on) => _set('corner_hidden', on ? true : null),
+                ),
+              ]),
+            ]),
+          ),
+        ]),
       ),
     );
-  }
-}
-
-class _Heading extends StatelessWidget {
-  const _Heading(this.text);
-
-  final String text;
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(2, 14, 0, 10),
-        child: Text(text.toUpperCase(), style: Look.cond(13, spacing: 2)),
-      );
-}
-
-class _Swatches extends StatelessWidget {
-  const _Swatches(this.children);
-
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) => Wrap(spacing: 12, runSpacing: 12, children: children);
-}
-
-class _Swatch extends StatelessWidget {
-  const _Swatch(this.color, this.name, this.on, this.onTap, {this.see = false, this.none = false});
-
-  final Color color;
-  final String name;
-  final bool on;
-  final VoidCallback onTap;
-  final bool see;
-  final bool none;
-
-  @override
-  Widget build(BuildContext context) {
-    return Tooltip(
-      message: name,
-      child: InkResponse(
-        onTap: onTap,
-        radius: 28,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: see ? color.withValues(alpha: 0.5) : color,
-            border: Border.all(color: on ? Look.accent : Look.edge, width: on ? 3 : 1.4),
-            boxShadow: on ? [BoxShadow(color: Look.accent.withValues(alpha: 0.4), blurRadius: 10)] : null,
-          ),
-          child: none ? const Icon(Icons.block_rounded, size: 18, color: Look.muted) : null,
-        ),
+    // back lets go of the picked thing or the pen first, so it waits for those too
+    return ListenableBuilder(
+      listenable: _decor,
+      child: page,
+      builder: (context, child) => PopScope(
+        canPop: !_saving && !_dirty && _decor.current == null && !_decor.pen,
+        onPopInvokedWithResult: (didPop, _) {
+          if (!didPop) _back();
+        },
+        child: child!,
       ),
     );
   }
@@ -323,29 +478,5 @@ class _PaperSwatch extends StatelessWidget {
         ]),
       ),
     );
-  }
-}
-
-class _Choices extends StatelessWidget {
-  const _Choices(this.items);
-
-  final List<(String, bool, VoidCallback)> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(spacing: 8, runSpacing: 8, children: [
-      for (final (name, on, tap) in items)
-        ChoiceChip(
-          label: Text(name),
-          selected: on,
-          showCheckmark: false,
-          labelStyle: Look.ui(13.5, weight: FontWeight.w600, color: on ? Look.bg : Look.cream),
-          selectedColor: Look.cream,
-          backgroundColor: Look.raised,
-          side: BorderSide.none,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          onSelected: (_) => tap(),
-        ),
-    ]);
   }
 }
