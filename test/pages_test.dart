@@ -760,7 +760,8 @@ void main() {
     });
     expect(App.samples.items, isNotEmpty, reason: 'the radio of the liked songs filled the feed');
     Shell.goTo(1);
-    await wait(tester);
+    // (the music before pauses, the sample comes in: a few rounds of both clocks)
+    await wait(tester, rounds: 8);
     expect(find.text('Samples'), findsWidgets);
     expect(find.text('Not for me'), findsWidgets);
     await shot(tester, 'samples');
