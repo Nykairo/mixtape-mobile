@@ -20,6 +20,7 @@ import 'scrobble.dart';
 import 'settings.dart';
 import 'store.dart';
 import 'together.dart';
+import 'ui/keys.dart';
 import 'ui/shell.dart';
 
 Future<void> main() async {
@@ -154,6 +155,7 @@ class _MixtapeAppState extends State<MixtapeApp> with WidgetsBindingObserver {
         title: 'Mixtape',
         debugShowCheckedModeBanner: false,
         theme: Look.theme(),
+        builder: (context, child) => Keys(child: child ?? const SizedBox.shrink()),
         home: Shell(key: Shell.stateKey),
       ),
     );

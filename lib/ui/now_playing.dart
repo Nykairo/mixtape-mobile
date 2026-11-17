@@ -171,6 +171,7 @@ class _NowPlayingState extends State<NowPlaying> {
             ListenableBuilder(
               listenable: App.library,
               builder: (context, _) {
+                if (t.fromPhone) return const OnThisPhone(size: 30);
                 final liked = App.library.isLiked(t);
                 return IconButton(
                   tooltip: liked ? 'Unlike' : 'Like',

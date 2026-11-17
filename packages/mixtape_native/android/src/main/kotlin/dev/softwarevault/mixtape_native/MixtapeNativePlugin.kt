@@ -26,12 +26,16 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
     private lateinit var context: Context
     private var activity: ActivityPluginBinding? = null
 
-    /** The answer waiting for a picture to be picked, and what it's for ("profile" or "tape"). */
+    /** The answer waiting for something to be picked, and what it's for: a picture ("profile" or "tape"), a
+     * library "file", or "music". */
     private var picking: MethodChannel.Result? = null
     private var pickingFor = "profile"
 
-    /** The tape a widget opened Mixtape with, until the app asks for it. */
+    /** The tape a widget opened Mixtape with (or "files"), until the app asks for it. */
     private var launched: String? = null
+
+    /** Music files opened with Mixtape from a files app, until the app asks for them (openedMusic). */
+    private var opened: List<Uri> = emptyList()
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         context = binding.applicationContext
@@ -49,7 +53,15 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
         activity = binding
         binding.addOnNewIntentListener(this)
         binding.addActivityResultListener(this)
-        Widgets.tapeOf(binding.activity.intent)?.let { launched = it }
+        // what the window was opened with: the app asks for it as it starts (widgetLaunch), and hears it
+        // right away when it runs already (the music kept it going while the window was closed)
+        val files = PhoneMusic.urisOf(binding.activity.intent)
+        if (files.isNotEmpty()) opened = files
+        val what = if (files.isNotEmpty()) "files" else Widgets.tapeOf(binding.activity.intent)
+        if (what != null) {
+            launched = what
+            channel.invokeMethod("widget", what)
+        }
     }
 
     override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) = onAttachedToActivity(binding)
@@ -62,11 +74,17 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
         activity = null
     }
 
-    /** The picture picked (or none): made into a profile picture away from the main thread. */
+    /** The picture picked (or none): made into a profile picture away from the main thread. Music files
+     * and a library file come back the same way. */
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?): Boolean {
         if (requestCode != PICK_PICTURE) return false
         val answer = picking ?: return true
         picking = null
+        if (pickingFor == "music") {
+            val uris = if (resultCode == Activity.RESULT_OK) PhoneMusic.picked(data) else emptyList()
+            offMain(answer) { PhoneMusic.read(context, uris) }
+            return true
+        }
         val uri = data?.data
         if (resultCode != Activity.RESULT_OK || uri == null) {
             answer.success(null)
@@ -129,8 +147,14 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
         return true
     }
 
-    /** A widget's tape tapped while Mixtape is open already. */
+    /** A widget's tape tapped while Mixtape is open already, or music files opened with it. */
     override fun onNewIntent(intent: Intent): Boolean {
+        val files = PhoneMusic.urisOf(intent)
+        if (files.isNotEmpty()) {
+            opened = files
+            channel.invokeMethod("widget", "files")
+            return true
+        }
         val tape = Widgets.tapeOf(intent) ?: return false
         channel.invokeMethod("widget", tape)
         return true
@@ -173,6 +197,31 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
                         result.success(null)
                     }
                 }
+            }
+            "pickMusic" -> {
+                val here = activity?.activity
+                if (here == null || picking != null) {
+                    result.success(emptyList<Any>())
+                } else {
+                    picking = result
+                    pickingFor = "music"
+                    val pick = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        type = "audio/*"
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        putExtra(Intent.EXTRA_ALLOW_MULTIPLE, true)
+                    }
+                    try {
+                        here.startActivityForResult(pick, PICK_PICTURE)
+                    } catch (e: android.content.ActivityNotFoundException) {
+                        picking = null
+                        result.success(emptyList<Any>())
+                    }
+                }
+            }
+            "openedMusic" -> {
+                val uris = opened
+                opened = emptyList()
+                offMain(result) { PhoneMusic.read(context, uris) }
             }
             "pickPicture" -> {
                 val here = activity?.activity

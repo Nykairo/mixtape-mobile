@@ -151,8 +151,10 @@ class Library extends ChangeNotifier {
 
   bool isLiked(Track t) => _likedIds.contains(t.id);
 
-  /// Likes a song, or unlikes it when it was liked. Returns whether it's liked now.
+  /// Likes a song, or unlikes it when it was liked. Returns whether it's liked now (a phone's own file
+  /// never is: see Track.fromPhone).
   bool toggleLike(Track t) {
+    if (t.fromPhone) return false;
     final now = !isLiked(t);
     if (now) {
       liked.add(t);
@@ -186,8 +188,12 @@ class Library extends ChangeNotifier {
     }
   }
 
+  /// A new tape (a phone's own files stay off it: they'd play nowhere else, nor here after a restart).
   Tape newTape(String name, {List<Track> songs = const []}) {
-    final tape = Tape(name: freeName(name), songs: [...songs]);
+    final tape = Tape(name: freeName(name), songs: [
+      for (final t in songs)
+        if (!t.fromPhone) t,
+    ]);
     tapes[tape.name] = tape;
     _changed();
     return tape;
@@ -198,7 +204,7 @@ class Library extends ChangeNotifier {
     final have = {for (final t in tape.songs) t.id};
     final fresh = [
       for (final t in songs)
-        if (have.add(t.id)) t,
+        if (!t.fromPhone && have.add(t.id)) t,
     ];
     if (fresh.isEmpty) return 0;
     tape.songs.addAll(fresh);
@@ -251,6 +257,7 @@ class Library extends ChangeNotifier {
   // ------------------------------------------------------------ played lately
 
   void played(Track t) {
+    if (t.fromPhone) return; // gone after a restart: no use coming back to it from Home
     recent.removeWhere((x) => x.id == t.id);
     recent.insert(0, t);
     if (recent.length > _recentMax) recent.removeRange(_recentMax, recent.length);

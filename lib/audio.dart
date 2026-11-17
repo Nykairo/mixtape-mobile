@@ -377,6 +377,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   AudioSource _source(Track t) {
     final saved = Downloads.the.fileOf(t);
     if (saved != null) return AudioSource.file(saved, tag: t.id); // on the phone: no internet needed
+    if (t.fromPhone && t.ref.startsWith('/')) return AudioSource.file(t.ref, tag: t.id); // an iPhone's copy
     return t.src == 'yt' ? YouTubeSource(t, _client) : AudioSource.uri(Uri.parse(t.ref), tag: t.id);
   }
 
@@ -386,8 +387,11 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
         artist: t.artist,
         album: t.album.isEmpty ? null : t.album,
         duration: t.dur > 0 ? Duration(seconds: t.dur) : null,
-        artUri: t.artAt(544).isEmpty ? null : Uri.tryParse(t.artAt(544)),
+        artUri: _artUri(t.artAt(544)),
       );
+
+  /// A cover on the internet, or (a phone file's own) in a file here.
+  static Uri? _artUri(String art) => art.isEmpty ? null : (art.startsWith('/') ? Uri.file(art) : Uri.tryParse(art));
 
   /// Plays these songs from [start] (songs that can't play on a phone are left out).
   Future<void> playSongs(List<Track> songs,
@@ -603,6 +607,12 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   void _failed(Object e, [StackTrace? st]) {
     final t = current;
     if (t == null) return;
+    if (t.fromPhone) {
+      // no internet to wait for: the file is gone, or in a format the phone can't play
+      notices.add("Skipped ${t.title}: the phone can't open that file.");
+      if (_player.hasNext) _player.seekToNext().then((_) => _go()).catchError((Object _) {});
+      return;
+    }
     final why = Links.trouble[t.ref];
     if (why != null && why != 'network' && why != 'busy') {
       notices.add('Skipped ${t.title}: ${_words[why] ?? _words['trouble']}');
@@ -736,15 +746,30 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   Future<void> _restore() async {
     final j = await Store.the.read(_sessionFile);
     if (j is! Map) return;
-    final songs = [
-      for (final x in j['songs'] is List ? j['songs'] as List : const [])
-        if (Track.fromJson(x) case final Track t)
-          if (t.playable) t,
+    final kept = [
+      for (final x in j['songs'] is List ? j['songs'] as List : const []) Track.fromJson(x),
     ];
+    final was = j['index'] is int ? j['index'] as int : 0;
+    var at = Duration(milliseconds: j['position'] is int ? j['position'] as int : 0);
+    // a file the files app handed over can't be opened again after a restart: it stays out, and the
+    // song it was at becomes the next one, from its start
+    final songs = <Track>[];
+    var before = 0;
+    var lost = false;
+    for (var k = 0; k < kept.length; k++) {
+      final t = kept[k];
+      if (t != null && t.playable && !t.fromPhone) {
+        songs.add(t);
+      } else if (k < was) {
+        before++;
+      } else if (k == was) {
+        lost = true;
+        at = Duration.zero;
+      }
+    }
     if (songs.isEmpty) return;
-    final index = (j['index'] is int ? j['index'] as int : 0).clamp(0, songs.length - 1);
-    final at = Duration(milliseconds: j['position'] is int ? j['position'] as int : 0);
-    _lastStarted = songs[index].id; // it played already; coming back doesn't count it again
+    final index = (was - before).clamp(0, songs.length - 1);
+    if (!lost) _lastStarted = songs[index].id; // it played already; coming back doesn't count it again
     from = '${j['from'] ?? ''}';
     fromTape = '${j['from_tape'] ?? ''}';
     mediaItem.add(_item(songs[index]));

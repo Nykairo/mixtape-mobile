@@ -18,6 +18,7 @@ import 'cassette.dart';
 import 'look.dart';
 import 'model.dart';
 import 'store.dart';
+import 'ui/add_music.dart';
 import 'ui/shell.dart';
 import 'ui/tape_page.dart';
 
@@ -117,8 +118,10 @@ class HomeWidgets {
   /// The cover as a file the widgets' side can read, fetched once per song (big enough for the Cover
   /// widget on a big phone).
   static Future<String> _cover(Track t) async {
+    final here = App.downloads.coverOf(t); // on the phone already: a saved song's, or a phone file's own
+    if (here != null) return here.path;
     final address = t.artAt(544);
-    if (address.isEmpty) return '';
+    if (address.isEmpty || address.startsWith('/')) return '';
     final file = Store.the.file('widget_cover.jpg');
     if (_coverFor != t.id) {
       try {
@@ -206,6 +209,9 @@ class HomeWidgets {
           audio.player.shuffleModeEnabled ? AudioServiceShuffleMode.none : AudioServiceShuffleMode.all);
     } else if (what.startsWith('tape:')) {
       _openTape(what.substring(5));
+    } else if (what == 'files') {
+      // music files opened with Mixtape from a files app (not a widget, but it comes the same way)
+      MixtapeNative.openedMusic().then(playPhoneFiles).ignore();
     }
     _later();
   }

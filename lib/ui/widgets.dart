@@ -75,6 +75,22 @@ class Pic extends StatelessWidget {
   }
 }
 
+/// In place of the heart for a music file on this phone: it plays only here, so it isn't liked.
+class OnThisPhone extends StatelessWidget {
+  const OnThisPhone({super.key, this.size = 24});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) => Tooltip(
+        message: 'A file on this phone: it plays only here',
+        child: SizedBox.square(
+          dimension: 48,
+          child: Icon(Icons.smartphone_rounded, size: size * 0.86, color: Look.faint),
+        ),
+      );
+}
+
 /// A song's cover (the saved one when the song is on the phone).
 class Cover extends StatelessWidget {
   const Cover(this.track, {super.key, this.size = 48, this.radius = 6});
@@ -301,15 +317,17 @@ Future<void> songMenu(BuildContext context, Track t, {Tape? tape, int? index}) {
                 leading: Cover(t, size: 46),
                 title: Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(15.5, weight: FontWeight.w700)),
                 subtitle: Text(t.artist, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(13, color: Look.muted)),
-                trailing: IconButton(
-                  tooltip: liked ? 'Unlike' : 'Like',
-                  onPressed: () {
-                    final now = lib.toggleLike(t);
-                    done(now ? 'In your liked songs' : 'Out of your liked songs');
-                  },
-                  icon: Icon(liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                      color: liked ? Look.accent : Look.muted),
-                ),
+                trailing: t.fromPhone
+                    ? const OnThisPhone()
+                    : IconButton(
+                        tooltip: liked ? 'Unlike' : 'Like',
+                        onPressed: () {
+                          final now = lib.toggleLike(t);
+                          done(now ? 'In your liked songs' : 'Out of your liked songs');
+                        },
+                        icon: Icon(liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                            color: liked ? Look.accent : Look.muted),
+                      ),
               ),
               if (t.playable)
                 Padding(
@@ -323,14 +341,16 @@ Future<void> songMenu(BuildContext context, Track t, {Tape? tape, int? index}) {
                       App.audio.addSongs([t]);
                       done('Added to the queue');
                     }),
-                    _Big(Icons.library_add_rounded, 'Put on tape', () async {
-                      Navigator.of(sheet).pop();
-                      await pickTape(context, [t]);
-                    }),
-                    _Big(Icons.ios_share_rounded, 'Share', () {
-                      Navigator.of(sheet).pop();
-                      shareSong(context, t);
-                    }),
+                    if (!t.fromPhone)
+                      _Big(Icons.library_add_rounded, 'Put on tape', () async {
+                        Navigator.of(sheet).pop();
+                        await pickTape(context, [t]);
+                      }),
+                    if (!t.fromPhone)
+                      _Big(Icons.ios_share_rounded, 'Share', () {
+                        Navigator.of(sheet).pop();
+                        shareSong(context, t);
+                      }),
                   ]),
                 ),
               const Divider(height: 1),
@@ -374,7 +394,7 @@ Future<void> songMenu(BuildContext context, Track t, {Tape? tape, int? index}) {
                     done('Saving ${t.title} on the phone');
                   }
                 }),
-              if (together.room != null && t.playable)
+              if (together.room != null && t.playable && !t.fromPhone)
                 _MenuRow(Icons.groups_rounded, together.canSteer ? 'Add to the room' : 'Ask the host for it', () {
                   together.addSongs([t]);
                   done(together.canSteer ? 'In the room' : null);

@@ -18,8 +18,8 @@ import 'shell.dart';
 import 'sign_in.dart';
 import 'widgets.dart';
 
-/// The library into a file, handed to the share sheet (to the files, a chat, or the computer).
-Future<void> _saveLibrary(BuildContext context) async {
+/// The library into a file, handed to the share sheet (to the files, a chat, or the computer). Ctrl+E.
+Future<void> saveLibrary(BuildContext context) async {
   try {
     final f = await App.library.exportFile();
     final shared = await MixtapeNative.shareFile(f.path, mime: 'application/json', text: 'My Mixtape library');
@@ -29,8 +29,8 @@ Future<void> _saveLibrary(BuildContext context) async {
   }
 }
 
-/// A library file from the phone's files, taken in next to what's here.
-Future<void> _takeInLibrary(BuildContext context) async {
+/// A library file from the phone's files, taken in next to what's here. Ctrl+I.
+Future<void> takeInLibrary(BuildContext context) async {
   final path = await MixtapeNative.pickFile();
   if (path == null || !context.mounted) return;
   say(context, 'Taking it in…');
@@ -215,7 +215,7 @@ class SettingsPage extends StatelessWidget {
                 '(Ctrl+I there).',
                 style: Look.ui(13, color: Look.muted, height: 1.35),
               ),
-              onTap: () => _saveLibrary(context),
+              onTap: () => saveLibrary(context),
             ),
             ListTile(
               leading: const Icon(Icons.file_open_outlined, color: Look.muted),
@@ -224,7 +224,7 @@ class SettingsPage extends StatelessWidget {
                 "A library file from the computer (Ctrl+E there) or another phone. What's here stays as it is.",
                 style: Look.ui(13, color: Look.muted, height: 1.35),
               ),
-              onTap: () => _takeInLibrary(context),
+              onTap: () => takeInLibrary(context),
             ),
             const SectionTitle('ListenBrainz and Last.fm'),
             ListTile(

@@ -9,12 +9,17 @@ library;
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mixtape/app.dart';
+import 'package:mixtape/audio.dart';
 import 'package:mixtape/cassette.dart';
 import 'package:mixtape/decor.dart';
 import 'package:mixtape/model.dart';
 import 'package:mixtape/rooms.dart' as rooms;
+import 'package:mixtape/store.dart';
+import 'package:mixtape/ui/add_music.dart';
+import 'package:mixtape/ui/keys.dart';
 import 'package:mixtape/ui/now_playing.dart';
 import 'package:mixtape/ui/pages.dart';
 import 'package:mixtape/ui/profile_page.dart';
@@ -283,10 +288,14 @@ void main() {
     final list = find.byType(Scrollable).first;
     await tester.scrollUntilVisible(find.text('Friends can listen along'), 300, scrollable: list);
     expect(find.text('Friends can listen along'), findsOneWidget);
-    await tester.scrollUntilVisible(find.textContaining('5 songs'), 300, scrollable: list);
+    await shot(tester, 'settings_together');
+    expect(App.downloads.all, hasLength(5), reason: 'the five songs the test put on the phone');
+    await tester.scrollUntilVisible(find.text('Saved on this phone'), 300, scrollable: list);
     await wait(tester);
     expect(find.textContaining('5 songs'), findsOneWidget, reason: 'the songs saved on the phone are counted');
     await shot(tester, 'settings_further');
+    await tester.scrollUntilVisible(find.text('Take one in'), 300, scrollable: list);
+    expect(find.text('Save it to a file'), findsOneWidget);
     await close(tester);
   });
 
@@ -343,6 +352,96 @@ void main() {
 
     lib.deleteTape(t);
     lib.toggleLike(Track.fromJson(fresh)!);
+    await close(tester);
+  });
+
+  testWidgets('Music files on the phone: they play, and stay off tapes, liked songs and Home', (tester) async {
+    await pumpApp(tester);
+    final file = {'src': 'file', 'ref': 'content://media/external/audio/7', 'title': 'Home recording', 'artist': 'Me', 'dur': 95};
+    await tester.runAsync(() async {
+      await playPhoneFiles([file, Box.songs[0].toJson()]).timeout(const Duration(seconds: 20));
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+    });
+    await tester.pump();
+    final t = App.audio.current!;
+    expect([t.fromPhone, t.title, App.audio.from, App.audio.songs.length], [true, 'Home recording', 'A file on this phone', 1]);
+
+    final lib = App.library;
+    expect(lib.toggleLike(t), isFalse);
+    expect(lib.isLiked(t), isFalse);
+    final tape = lib.newTape('Files', songs: [t, Box.songs[0]]);
+    expect(tape.songs, [Box.songs[0]]);
+    expect(lib.addTo(tape, [t]), 0);
+    lib.deleteTape(tape);
+    expect(lib.recent.where((s) => s.fromPhone), isEmpty);
+
+    // its menu: next, or later in the queue; no heart, no tapes, no sharing
+    unawaited(songMenu(tester.element(find.byType(Shell)), t));
+    await wait(tester);
+    expect(find.text('Add to queue'), findsOneWidget);
+    expect(find.text('Put on tape'), findsNothing);
+    expect(find.text('Share'), findsNothing);
+    expect(find.byTooltip('A file on this phone: it plays only here'), findsWidgets);
+    await tester.tapAt(const Offset(200, 40));
+    await wait(tester);
+
+    // after a restart the file is left out of the queue that comes back, and the song after it waits
+    await tester.runAsync(() async {
+      await Store.the.write('session.json', {
+        'songs': [Box.songs[0].toJson(), file, Box.songs[1].toJson()],
+        'index': 1,
+        'position': 30000,
+      });
+      final again = MixtapeAudio();
+      await again.ready;
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect([for (final s in again.songs) s.id], [Box.songs[0].id, Box.songs[1].id]);
+      expect(again.current?.id, Box.songs[1].id);
+      expect(again.player.position, Duration.zero);
+      await again.player.dispose();
+    });
+    await close(tester);
+  });
+
+  testWidgets('A keyboard: the keys the computer has, and a text field keeps its own', (tester) async {
+    await pumpApp(tester, builder: (context, child) => Keys(child: child!));
+    await Box.startMusic(tester);
+    expect(App.audio.player.playing, isTrue);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+    expect(App.audio.player.playing, isFalse);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+    expect(App.audio.player.playing, isTrue);
+
+    Future<void> ctrl(LogicalKeyboardKey key, {bool alt = false}) async {
+      final hold = alt ? LogicalKeyboardKey.altLeft : LogicalKeyboardKey.controlLeft;
+      await tester.sendKeyDownEvent(hold);
+      await tester.sendKeyEvent(key);
+      await tester.sendKeyUpEvent(hold);
+      await wait(tester);
+    }
+
+    // Ctrl+F: the search field takes the keys, and Space is a space there
+    await ctrl(LogicalKeyboardKey.keyF);
+    expect(Shell.tab.value, 2);
+    expect(FocusManager.instance.primaryFocus?.context?.findAncestorStateOfType<EditableTextState>(), isNotNull);
+    await tester.sendKeyEvent(LogicalKeyboardKey.space);
+    await tester.pump();
+    expect(App.audio.player.playing, isTrue);
+    FocusManager.instance.primaryFocus?.unfocus();
+    await wait(tester);
+
+    // Alt+Left goes back the way the phone's back does: from Search to Home
+    await ctrl(LogicalKeyboardKey.arrowLeft, alt: true);
+    expect(Shell.tab.value, 0);
+
+    // Ctrl+P opens the player, Alt+Left closes it again
+    await ctrl(LogicalKeyboardKey.keyP);
+    expect(find.byType(NowPlaying), findsOneWidget);
+    await ctrl(LogicalKeyboardKey.arrowLeft, alt: true);
+    await wait(tester);
+    expect(find.byType(NowPlaying), findsNothing);
     await close(tester);
   });
 
