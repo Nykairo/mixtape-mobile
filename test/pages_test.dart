@@ -407,11 +407,12 @@ void main() {
     await pumpApp(tester, builder: (context, child) => Keys(child: child!));
     await Box.startMusic(tester);
     expect(App.audio.player.playing, isTrue);
+    // (the player was made outside the test's clock: what it does next only happens while real time runs)
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
-    await tester.pump();
+    await wait(tester);
     expect(App.audio.player.playing, isFalse);
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
-    await tester.pump();
+    await wait(tester);
     expect(App.audio.player.playing, isTrue);
 
     Future<void> ctrl(LogicalKeyboardKey key, {bool alt = false}) async {
@@ -427,7 +428,7 @@ void main() {
     expect(Shell.tab.value, 2);
     expect(FocusManager.instance.primaryFocus?.context?.findAncestorStateOfType<EditableTextState>(), isNotNull);
     await tester.sendKeyEvent(LogicalKeyboardKey.space);
-    await tester.pump();
+    await wait(tester);
     expect(App.audio.player.playing, isTrue);
     FocusManager.instance.primaryFocus?.unfocus();
     await wait(tester);
