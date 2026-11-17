@@ -174,6 +174,16 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
                 context.startActivity(chooser)
                 result.success(null)
             }
+            "keepAwake" -> {
+                // a video over the whole screen: the screen stays on while it shows
+                val window = activity?.activity?.window
+                if (call.argument<Boolean>("on") == true) {
+                    window?.addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                } else {
+                    window?.clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                }
+                result.success(null)
+            }
             "shareImage" -> result.success(shareFile(call.argument<String>("path") ?: "", "image/png", call.argument<String>("text")))
             "shareFile" -> result.success(
                 shareFile(call.argument<String>("path") ?: "", call.argument<String>("mime") ?: "application/octet-stream", call.argument<String>("text"))

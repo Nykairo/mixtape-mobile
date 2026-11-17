@@ -21,6 +21,7 @@ import 'package:mixtape/model.dart';
 import 'package:mixtape/rooms.dart' as rooms;
 import 'package:mixtape/store.dart';
 import 'package:mixtape/ui/add_music.dart';
+import 'package:mixtape/ui/full_video.dart';
 import 'package:mixtape/ui/keys.dart';
 import 'package:mixtape/ui/now_playing.dart';
 import 'package:mixtape/ui/pages.dart';
@@ -560,6 +561,48 @@ void main() {
     expect(NowPlaying.showing, isFalse);
   });
 
+  testWidgets('The music video over the whole screen: its keys, a double tap to jump, and back', (tester) async {
+    await pumpApp(tester);
+    await Box.startMusic(tester);
+    unawaited(FullVideo.open(inside(tester)));
+    await wait(tester);
+    expect(find.byType(FullVideo), findsOneWidget);
+    // (the tests have no video player: it says what shows instead, the keys are there all the same)
+    expect(find.byType(VideoWords), findsOneWidget);
+    expect(find.byTooltip('Leave full screen'), findsOneWidget);
+    expect(find.byTooltip('Pause'), findsOneWidget);
+    expect(find.text(Box.songs.first.title), findsOneWidget);
+    await shot(tester, 'video_full');
+
+    // a double tap on the right: 10 seconds ahead, and it says so for a moment
+    final room = tester.getSize(find.byType(FullVideo));
+    final right = Offset(room.width * 0.86, room.height * 0.35);
+    final before = App.audio.player.position;
+    await tester.tapAt(right);
+    await tester.pump(const Duration(milliseconds: 60));
+    await tester.tapAt(right);
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(find.byIcon(Icons.forward_10_rounded), findsOneWidget);
+    await wait(tester);
+    final ahead = App.audio.player.position - before;
+    expect(ahead.inMilliseconds, inInclusiveRange(9000, 13000));
+    expect(find.byIcon(Icons.forward_10_rounded), findsNothing);
+
+    // a tap takes the keys away (they also go by themselves after a few seconds), another brings them back
+    final left = Offset(room.width * 0.2, room.height * 0.35);
+    await tester.tapAt(left);
+    await wait(tester);
+    expect(find.byTooltip('Leave full screen'), findsNothing);
+    await tester.tapAt(left);
+    await wait(tester);
+    expect(find.byTooltip('Leave full screen'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Leave full screen'));
+    await wait(tester);
+    expect(find.byType(FullVideo), findsNothing);
+    await close(tester);
+  });
+
   testWidgets('Together: the ways in, listening along, a room and a party', (tester) async {
     Box.account.waiting = [
       {'sender': 'u2', 'code': 'KX72PQ', 'kind': 'party', 'room_name': 'Anna’s birthday', 'at': '2026-11-15T10:00:00Z'},
@@ -720,6 +763,37 @@ void main() {
     Shell.goTo(0);
     await wait(tester, rounds: 12);
     expect(App.samples.player.playing, isFalse, reason: 'Samples stops when its tab is left');
+    await close(tester);
+  });
+
+  testWidgets('Samples: when one is over, the page turns by itself and the two run into each other', (tester) async {
+    await pumpApp(tester);
+    final feed = App.samples;
+    await tester.runAsync(() async {
+      if (feed.items.length < 3) await feed.more().timeout(const Duration(seconds: 20));
+    });
+    expect(feed.items.length, greaterThan(2));
+    Shell.goTo(1);
+    await wait(tester, rounds: 6);
+    final k = feed.index;
+    expect(k, greaterThanOrEqualTo(0));
+    final start = feed.items[k].start ?? 0;
+    // nearly at the end of its half minute
+    await tester.runAsync(() async {
+      await feed.player.seek(Duration(milliseconds: (start * 1000).round() + 29600));
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+    });
+    await wait(tester, rounds: 6);
+    expect(feed.index, k + 1, reason: 'the page turned to the next one by itself');
+    expect(feed.paused, isFalse);
+    // once they've run into each other, the new one plays on its own at full volume
+    await wait(tester, rounds: 6);
+    expect(feed.player.playing, isTrue);
+    expect(feed.player.volume, closeTo(1, 0.01));
+    await shot(tester, 'samples_next');
+    Shell.goTo(0);
+    await wait(tester, rounds: 12);
+    expect(feed.player.playing, isFalse);
     await close(tester);
   });
 

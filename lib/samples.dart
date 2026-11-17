@@ -1,9 +1,10 @@
 /// Samples: songs you don't know yet, each from its best half minute (the part people replay the most),
-/// flicked through one after another like on TikTok. The computer's Samples page, for the phone.
+/// flicked through one after another like on TikTok. The computer's Samples page, for the phone. When a
+/// half minute is over, the page flicks on to the next one by itself and the two run into each other.
 ///
 /// Samples has its own two players: one plays, the other has the next song loaded already, so a flick
-/// starts it at once; the best parts and addresses of the few after that are looked up meanwhile. The
-/// music that was on waits, and carries on when you leave Samples.
+/// starts it at once (and the two can blend); the best parts and addresses of the few after that are
+/// looked up meanwhile. The music that was on waits, and carries on when you leave Samples.
 library;
 
 import 'dart:async';
@@ -83,6 +84,21 @@ class Samples extends ChangeNotifier {
   int index = -1; // the sample that plays
   bool paused = false;
   StreamSubscription<Duration>? _loop;
+  final _fades = <Timer?>[null, null]; // a player's volume on its way up or down
+  final _fadeEnds = <Completer<void>?>[null, null];
+
+  /// Asked to flick on to the sample at the given place when the one that plays is over: true when the
+  /// page does it (its [show] then lets the two run into each other). Null while no page shows the feed.
+  bool Function(int)? flickTo;
+  int? _coming; // the sample that comes by itself, asked for at the end of the one before
+
+  /// One sample into the next when it comes by itself, and on a flick.
+  static const _blend = Duration(milliseconds: 1800);
+  static const _snap = Duration(milliseconds: 240);
+
+  /// How long before the end of its half minute the page flicks on (half of that goes by before the next
+  /// sample starts, as the page turns).
+  static const _lead = Duration(milliseconds: 700);
 
   /// How far into its half minute the sample that plays is (0 to 1).
   final progress = ValueNotifier<double>(0);
@@ -181,12 +197,15 @@ class Samples extends ChangeNotifier {
     }
   }
 
-  /// Plays the sample at [k] (from its best part, round and round). The next one loads in the other
-  /// player meanwhile, and the few after it are looked up.
+  /// Plays the sample at [k] from its best part, the one before going quiet meanwhile (slowly when this
+  /// one came by itself, so they run into each other). The next one loads in the other player, and the
+  /// few after it are looked up.
   Future<void> show(int k) async {
     if (k < 0 || k >= items.length) return;
     final s = items[k];
-    final before = player;
+    final was = _on;
+    final blend = _coming == k ? _blend : _snap;
+    _coming = null;
     index = k;
     paused = false;
     progress.value = 0;
@@ -194,33 +213,101 @@ class Samples extends ChangeNotifier {
     notifyListeners();
     await _loop?.cancel();
     _loop = null;
-    await before.pause();
+    if (was != _on) {
+      unawaited(_fade(was, 0, blend));
+    } else {
+      _stopFade(was); // the same player gets the new song
+      await _players[was].pause();
+    }
     await _load(_on, s); // nothing to wait for when it's loaded already
     if (index != k) return; // flicked on meanwhile
     final p = player;
     final start = Duration(milliseconds: ((s.start ?? 0) * 1000).round());
-    final end = start + const Duration(seconds: 30);
-    _loop = p.positionStream.listen((pos) {
-      if (pos >= end) p.seek(start).ignore();
-      progress.value = ((pos - start).inMilliseconds / (length * 1000)).clamp(0.0, 1.0);
-    });
+    _loop = p.positionStream.listen((pos) => _heard(k, pos, start));
     // a player that loaded ahead waits at the start already; one that played it before goes back
     if ((p.position - start).abs() > const Duration(milliseconds: 400)) await p.seek(start);
     if (index != k) return;
+    _stopFade(_on);
+    await p.setVolume(0);
     unawaited(p.play().catchError((Object _) {}));
+    unawaited(_fade(_on, 1, blend));
     if (k + 1 >= items.length - 3) unawaited(more());
-    if (k + 1 < items.length) unawaited(_load(1 - _on, items[k + 1]));
+    if (k + 1 < items.length) {
+      final other = 1 - _on, next = items[k + 1];
+      // the other player may still be fading out the one before: the next one goes in when it's quiet
+      unawaited(() async {
+        await _settled(other);
+        if (index == k) await _load(other, next);
+      }());
+    }
     for (final later in items.skip(k + 2).take(3)) {
       _startOf(later).ignore();
       Links.warm(later.track);
     }
   }
 
+  /// The sample at [k] as it plays: the bar follows it, and a little before its half minute is over
+  /// the page is asked to flick on. The last one there is (or one no page can flick on from) goes round.
+  void _heard(int k, Duration pos, Duration start) {
+    progress.value = ((pos - start).inMilliseconds / (length * 1000)).clamp(0.0, 1.0);
+    final end = start + Duration(milliseconds: (length * 1000).round());
+    if (index != k || paused) return;
+    if (_coming != null) {
+      // the page didn't turn after all (a finger held it): this one goes round again
+      if (pos >= end + const Duration(seconds: 4)) {
+        _coming = null;
+        player.seek(start).ignore();
+      }
+      return;
+    }
+    if (pos < end - _lead) return;
+    if (k + 1 < items.length && (flickTo?.call(k + 1) ?? false)) {
+      _coming = k + 1;
+    } else if (pos >= end) {
+      player.seek(start).ignore();
+    }
+  }
+
+  /// Turns player [k]'s volume to [to] over [over], evenly loud on the way (the two together sound as
+  /// loud as one). Down to nothing, it pauses.
+  Future<void> _fade(int k, double to, Duration over) {
+    _stopFade(k);
+    final p = _players[k];
+    final from = p.volume;
+    final steps = max(1, over.inMilliseconds ~/ 40);
+    final end = _fadeEnds[k] = Completer<void>();
+    _fades[k] = Timer.periodic(const Duration(milliseconds: 40), (t) {
+      final f = min(1.0, t.tick / steps);
+      final curve = to > from ? sin(f * pi / 2) : 1 - cos(f * pi / 2);
+      p.setVolume(from + (to - from) * curve).ignore();
+      if (f < 1) return;
+      if (to == 0) p.pause().ignore();
+      _stopFade(k);
+    });
+    return end.future;
+  }
+
+  void _stopFade(int k) {
+    _fades[k]?.cancel();
+    _fades[k] = null;
+    final end = _fadeEnds[k];
+    _fadeEnds[k] = null;
+    if (end != null && !end.isCompleted) end.complete();
+  }
+
+  /// Done when player [k] is quiet: at once when it isn't fading.
+  Future<void> _settled(int k) => _fadeEnds[k]?.future ?? Future.value();
+
   void toggle() {
     if (index < 0) return;
     paused = !paused;
     if (paused) {
-      player.pause().ignore();
+      // the one before may still be fading out: both go quiet, and this one comes back at full volume
+      for (var k = 0; k < 2; k++) {
+        _stopFade(k);
+        _players[k].pause().ignore();
+      }
+      player.setVolume(1).ignore();
     } else {
       unawaited(player.play().catchError((Object _) {}));
     }
@@ -231,7 +318,9 @@ class Samples extends ChangeNotifier {
   Future<void> stop() async {
     await _loop?.cancel();
     _loop = null;
+    _coming = null;
     for (var k = 0; k < 2; k++) {
+      _stopFade(k);
       _loaded[k] = null;
       _loading[k] = null;
       await _players[k].stop();
@@ -243,6 +332,8 @@ class Samples extends ChangeNotifier {
   @override
   void dispose() {
     _loop?.cancel();
+    _stopFade(0);
+    _stopFade(1);
     progress.dispose();
     for (final p in _players) {
       p.dispose();

@@ -1,3 +1,8 @@
+**New in 0.3.2**
+
+- The music video over the whole screen: the key in its corner turns the phone on its side, with the song's keys over it for a tap and a double tap on either side to jump 10 seconds. The screen stays on meanwhile.
+- Samples go on by themselves: when one's half minute is over, the page turns to the next and the two run into each other.
+
 **New in 0.3.1**
 
 - A new icon: the same tape as Mixtape on the computer, on a dark tile. It comes in the wallpaper's colors too on Android 13 and newer, and in the dark and tinted looks on the iPhone.

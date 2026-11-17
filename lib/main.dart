@@ -25,6 +25,7 @@ import 'together.dart';
 import 'ui/keys.dart';
 import 'ui/now_playing.dart';
 import 'ui/shell.dart';
+import 'ui/turning.dart';
 import 'video.dart';
 
 Future<void> main() async {
@@ -116,14 +117,13 @@ class MixtapeApp extends StatefulWidget {
 
 class _MixtapeAppState extends State<MixtapeApp> with WidgetsBindingObserver {
   DateTime _away = DateTime.now();
-  bool? _big;
   StreamSubscription<bool>? _cardTaps;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _turning();
+    appTurning();
     // a tap on the music card (lock screen, notification) opens the big player, like the other music apps
     _cardTaps = AudioService.notificationClicked.where((tapped) => tapped).listen((_) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -133,20 +133,9 @@ class _MixtapeAppState extends State<MixtapeApp> with WidgetsBindingObserver {
     });
   }
 
-  /// Phones stay upright, like the music apps next to them; a tablet or an unfolded foldable turns with
-  /// the hand. (Folding one up again puts it back upright.)
-  void _turning() {
-    final views = WidgetsBinding.instance.platformDispatcher.views;
-    if (views.isEmpty) return;
-    final v = views.first;
-    final big = v.physicalSize.shortestSide / v.devicePixelRatio >= 600;
-    if (big == _big) return;
-    _big = big;
-    SystemChrome.setPreferredOrientations(big ? const [] : const [DeviceOrientation.portraitUp]);
-  }
-
+  /// Phones stay upright, a tablet or an unfolded foldable turns with the hand (ui/turning.dart).
   @override
-  void didChangeMetrics() => _turning();
+  void didChangeMetrics() => appTurning();
 
   @override
   void dispose() {

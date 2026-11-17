@@ -58,6 +58,10 @@ public class MixtapeNativePlugin: NSObject, FlutterPlugin {
       result(share([URL(fileURLWithPath: path)]))
     case "pickFile":
       pickFile(result)
+    case "keepAwake":
+      // a video over the whole screen: the screen stays on while it shows
+      UIApplication.shared.isIdleTimerDisabled = args["on"] as? Bool ?? false
+      result(nil)
     case "pickMusic":
       pickMusic(result)
     case "openedMusic":

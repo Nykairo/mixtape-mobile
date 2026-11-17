@@ -106,6 +106,17 @@ class MixtapeNative {
     }
   }
 
+  /// The screen stays on (a video over the whole screen) or goes back to turning off by itself.
+  static Future<void> keepAwake(bool on) async {
+    try {
+      await _channel.invokeMethod<void>('keepAwake', {'on': on});
+    } on MissingPluginException {
+      // not on a phone (the tests)
+    } on PlatformException {
+      // the screen just does what it always does
+    }
+  }
+
   /// Music files picked from the phone, with what's written inside them: songs as the app keeps them
   /// ({src: file, ref, title, artist, album, dur, art}). Empty when none were picked.
   static Future<List<Map<String, Object?>>> pickMusic() async {

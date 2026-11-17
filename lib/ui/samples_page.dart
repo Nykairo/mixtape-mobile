@@ -1,6 +1,7 @@
-/// Samples: one song at a time on the whole screen, from its best half minute, round and round until
-/// you flick to the next one (like TikTok, like YouTube Music's Samples). Like it, put it on a tape, play
-/// the whole song, or say you're not interested. The music that was on waits and carries on after.
+/// Samples: one song at a time on the whole screen, from its best half minute; then the page turns to the
+/// next one by itself and the two run into each other, or you flick on sooner (like TikTok, like YouTube
+/// Music's Samples). Like it, put it on a tape, play the whole song, or say you're not interested. The
+/// music that was on waits and carries on after.
 library;
 
 import 'dart:math';
@@ -38,6 +39,7 @@ class _SamplesPageState extends State<SamplesPage> {
   @override
   void dispose() {
     Shell.tab.removeListener(_tabChanged);
+    _feed?.flickTo = null;
     _pages.dispose();
     super.dispose();
   }
@@ -49,12 +51,14 @@ class _SamplesPageState extends State<SamplesPage> {
     _shown = on;
     if (on) {
       final feed = _feed ??= App.samples;
+      feed.flickTo = (k) => _turn(_pages, k);
       _wasPlaying = App.audio.player.playing;
       if (_wasPlaying) await App.audio.pause();
       if (feed.items.isEmpty) await feed.more();
       final k = _pages.hasClients ? (_pages.page ?? 0).round() : 0;
       await feed.show(k < feed.items.length ? k : 0);
     } else {
+      _feed?.flickTo = null;
       await _feed?.stop();
       if (_wasPlaying) await App.audio.play();
     }
@@ -124,6 +128,14 @@ class _SamplesPageState extends State<SamplesPage> {
   }
 }
 
+/// When a sample is over, the page turns to the next one by itself, unhurried (Samples lets the two
+/// run into each other meanwhile). Not while a finger is on it.
+bool _turn(PageController pages, int k) {
+  if (!pages.hasClients || pages.position.isScrollingNotifier.value) return false;
+  pages.animateToPage(k, duration: const Duration(milliseconds: 650), curve: Curves.easeInOutCubic);
+  return true;
+}
+
 /// One artist's Samples, over the whole screen: their songs one after another, each from its best
 /// half minute. The music that was on waits, and carries on when this closes.
 class ArtistSamplesPage extends StatefulWidget {
@@ -147,6 +159,7 @@ class _ArtistSamplesPageState extends State<ArtistSamplesPage> {
   @override
   void initState() {
     super.initState();
+    _feed.flickTo = (k) => _turn(_pages, k);
     _start();
   }
 
@@ -160,6 +173,7 @@ class _ArtistSamplesPageState extends State<ArtistSamplesPage> {
   @override
   void dispose() {
     final feed = _feed;
+    feed.flickTo = null;
     feed.stop().whenComplete(feed.dispose).ignore();
     if (_wasPlaying && !_left) App.audio.play().ignore();
     _pages.dispose();
