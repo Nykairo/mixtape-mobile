@@ -6,6 +6,7 @@ import Flutter
 import PhotosUI
 import SwiftUI // Xcode 26 loses the photo picker's types next to WidgetKit unless SwiftUI is here too
 import UIKit
+import UniformTypeIdentifiers
 
 public class MixtapeNativePlugin: NSObject, FlutterPlugin {
   /// The App Group the app and its widgets share. Sideloading tools give it a name of their own and say
@@ -47,6 +48,14 @@ public class MixtapeNativePlugin: NSObject, FlutterPlugin {
       }
       let text = args["text"] as? String ?? ""
       result(share(text.isEmpty ? [image] : [image, text]))
+    case "shareFile":
+      guard let path = args["path"] as? String, FileManager.default.fileExists(atPath: path) else {
+        result(false)
+        return
+      }
+      result(share([URL(fileURLWithPath: path)]))
+    case "pickFile":
+      pickFile(result)
     case "pickPicture":
       pick(args["for"] as? String ?? "profile", result)
     case "widget":
@@ -110,6 +119,24 @@ public class MixtapeNativePlugin: NSObject, FlutterPlugin {
     config.selectionLimit = 1
     let picker = PHPickerViewController(configuration: config)
     picker.delegate = self
+    top.present(picker, animated: true)
+  }
+
+  /// A file from the phone's Files (a library to take in), copied where the app can read it.
+  private func pickFile(_ result: @escaping FlutterResult) {
+    guard #available(iOS 14, *) else {
+      result(nil)
+      return
+    }
+    guard let top = topController() else {
+      result(nil)
+      return
+    }
+    picking?(nil)
+    picking = result
+    let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.json, .plainText, .data], asCopy: true)
+    picker.delegate = self
+    picker.allowsMultipleSelection = false
     top.present(picker, animated: true)
   }
 
@@ -189,6 +216,32 @@ extension MixtapeNativePlugin: PHPickerViewControllerDelegate {
         answer(made)
       }
     }
+  }
+}
+
+extension MixtapeNativePlugin: UIDocumentPickerDelegate {
+  public func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+    guard let answer = picking else { return }
+    picking = nil
+    guard let from = urls.first else {
+      answer(nil)
+      return
+    }
+    // a copy of its own in the app's temporary folder, that stays readable after the picker is gone
+    let to = FileManager.default.temporaryDirectory.appendingPathComponent("picked")
+    try? FileManager.default.removeItem(at: to)
+    let reading = from.startAccessingSecurityScopedResource()
+    defer {
+      if reading {
+        from.stopAccessingSecurityScopedResource()
+      }
+    }
+    answer((try? FileManager.default.copyItem(at: from, to: to)) != nil ? to.path : nil)
+  }
+
+  public func documentPickerWasCancelled(_ controller: UIDocumentPickerViewController) {
+    picking?(nil)
+    picking = nil
   }
 }
 

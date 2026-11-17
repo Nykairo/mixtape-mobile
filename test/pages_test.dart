@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mixtape/app.dart';
 import 'package:mixtape/cassette.dart';
 import 'package:mixtape/decor.dart';
+import 'package:mixtape/model.dart';
 import 'package:mixtape/rooms.dart' as rooms;
 import 'package:mixtape/ui/now_playing.dart';
 import 'package:mixtape/ui/pages.dart';
@@ -286,6 +287,62 @@ void main() {
     await wait(tester);
     expect(find.textContaining('5 songs'), findsOneWidget, reason: 'the songs saved on the phone are counted');
     await shot(tester, 'settings_further');
+    await close(tester);
+  });
+
+  testWidgets('The library in a file: out the way the computer takes it in, and back in', (tester) async {
+    await pumpApp(tester);
+    final lib = App.library;
+    final out = (await tester.runAsync(lib.exportLibrary))!;
+    expect(out.keys, containsAll(['liked', 'playlists', 'notes', 'papers', 'designs']));
+    expect((out['notes'] as Map)['Road trip'], 'windows down');
+    expect((out['papers'] as Map)['Night drive'], 7);
+    final night = (out['designs'] as Map)['Night drive'] as Map;
+    expect(night['items'], isNotEmpty);
+    expect(night.containsKey('layer'), isFalse, reason: "the phones' own picture stays on the phone");
+
+    // a library from the computer: a liked song and a tape that aren't here yet, and tapes that are
+    const photo = 'c0ffee00c0ffee00c0ff.png';
+    final fresh = {'src': 'yt', 'ref': 'zzTape00001', 'title': 'Brand new', 'artist': 'Somebody', 'dur': 200};
+    final file = {
+      'liked': [fresh, for (final t in lib.liked.take(2)) t.toJson()],
+      'playlists': {
+        'From the computer': [Box.songs[1].toJson(), Box.songs[2].toJson(), 'not a song'],
+        'Night drive': <Object?>[],
+      },
+      'notes': {'From the computer': 'for the road', 'Road trip': 'not this one'},
+      'papers': {'From the computer': 5, 'Night drive': 2},
+      'designs': {
+        'From the computer': {
+          'shell': 'red',
+          'items': [
+            {'kind': 'sticker', 'shape': 'heart', 'x': 0.5, 'y': 0.5, 's': 0.2, 'rot': 8},
+            {'kind': 'photo', 'image': photo, 'x': 0.3, 'y': 0.4, 's': 0.3},
+            {'kind': 'nonsense'},
+          ],
+        },
+      },
+      'sticker_images': {
+        photo: 'iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAEUlEQVR4nGP4X3XgPwgzwBgAc2YM4RZakNwAAAAASUVORK5CYII=',
+        '../../escape.png': 'iVBORw0KGgo=',
+      },
+    };
+    final (likes, tapes) = (await tester.runAsync(() => lib.importLibrary(file)))!;
+    expect([likes, tapes], [1, 1]);
+    final t = lib.tapes['From the computer']!;
+    expect([t.songs.length, t.note, t.paper], [2, 'for the road', 5]);
+    expect((t.design!['items'] as List).length, 2, reason: 'what makes no sense stays out');
+    expect(lib.havePicture(photo), isNotNull);
+    expect(lib.layerOf(t), isNotNull, reason: 'the phones get a picture of its decorations');
+    expect(lib.tapes['Night drive']!.songs, isNotEmpty, reason: 'a tape that is here stays as it is');
+    expect(lib.tapes['Night drive']!.paper, 7);
+    expect(lib.tapes['Road trip']!.note, 'windows down');
+    expect(lib.liked.where((s) => s.ref == 'zzTape00001'), hasLength(1));
+    await expectLater(lib.importLibrary('nonsense'), throwsA(isA<FormatException>()));
+    await expectLater(lib.importLibrary({'liked': 'nope'}), throwsA(isA<FormatException>()));
+
+    lib.deleteTape(t);
+    lib.toggleLike(Track.fromJson(fresh)!);
     await close(tester);
   });
 

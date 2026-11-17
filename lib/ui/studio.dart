@@ -280,7 +280,12 @@ class _StudioPageState extends State<StudioPage> with SingleTickerProviderStateM
       appBar: AppBar(
         backgroundColor: Look.bg,
         surfaceTintColor: Colors.transparent,
-        title: Text('Tape studio', style: Look.ui(19, weight: FontWeight.w800)),
+        // on a narrow phone the name shrinks a little rather than losing its end to undo and redo
+        title: FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text('Tape studio', style: Look.ui(19, weight: FontWeight.w800)),
+        ),
         actions: [
           IconButton(
             tooltip: 'Undo',

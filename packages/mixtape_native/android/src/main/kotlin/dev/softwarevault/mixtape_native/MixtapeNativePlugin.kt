@@ -3,6 +3,7 @@ package dev.softwarevault.mixtape_native
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.os.Handler
 import android.os.Looper
 import io.flutter.embedding.engine.plugins.FlutterPlugin
@@ -72,7 +73,59 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
             return true
         }
         val what = pickingFor
-        offMain(answer) { if (what == "tape") ProfilePicture.forTape(context, uri) else ProfilePicture.from(context, uri) }
+        offMain(answer) {
+            when (what) {
+                "file" -> copyPicked(uri)
+                "tape" -> ProfilePicture.forTape(context, uri)
+                else -> ProfilePicture.from(context, uri)
+            }
+        }
+        return true
+    }
+
+    /** A file picked to read (a library), copied where the app can read it: its path, or null. */
+    private fun copyPicked(uri: Uri): String? {
+        val folder = java.io.File(context.cacheDir, "picked").apply { mkdirs() }
+        folder.listFiles()?.forEach { it.delete() }
+        val file = java.io.File(folder, "picked")
+        val input = context.contentResolver.openInputStream(uri) ?: return null
+        input.use { from ->
+            file.outputStream().use { to ->
+                val buf = ByteArray(64 * 1024)
+                var total = 0L
+                while (true) {
+                    val n = from.read(buf)
+                    if (n < 0) break
+                    total += n
+                    if (total > 64L * 1024 * 1024) return null // far too big for a library
+                    to.write(buf, 0, n)
+                }
+            }
+        }
+        return file.path
+    }
+
+    /** Hands a file Mixtape made to another app, copied into the shared folder first (only it can be read from there). */
+    private fun shareFile(path: String, mime: String, text: String?): Boolean {
+        val from = java.io.File(path)
+        if (!from.isFile) return false
+        val folder = SharedFiles.folder(context)
+        folder.listFiles()?.forEach { if (System.currentTimeMillis() - it.lastModified() > 3_600_000) it.delete() }
+        val file = java.io.File(folder, from.name)
+        try {
+            from.copyTo(file, overwrite = true)
+        } catch (e: java.io.IOException) {
+            return false // the phone is full
+        }
+        val send = Intent(Intent.ACTION_SEND).apply {
+            type = mime
+            putExtra(Intent.EXTRA_STREAM, SharedFiles.uriOf(context, file))
+            text?.takeIf { it.isNotEmpty() }?.let { putExtra(Intent.EXTRA_TEXT, it) }
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        val chooser = Intent.createChooser(send, null).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val here = activity?.activity
+        if (here != null) here.startActivity(chooser) else context.startActivity(chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
         return true
     }
 
@@ -97,26 +150,28 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
                 context.startActivity(chooser)
                 result.success(null)
             }
-            "shareImage" -> {
-                // the picture is copied into the shared folder first, so only it can be read from there
-                val from = java.io.File(call.argument<String>("path") ?: "")
-                if (!from.isFile) {
-                    result.success(false)
+            "shareImage" -> result.success(shareFile(call.argument<String>("path") ?: "", "image/png", call.argument<String>("text")))
+            "shareFile" -> result.success(
+                shareFile(call.argument<String>("path") ?: "", call.argument<String>("mime") ?: "application/octet-stream", call.argument<String>("text"))
+            )
+            "pickFile" -> {
+                val here = activity?.activity
+                if (here == null || picking != null) {
+                    result.success(null)
                 } else {
-                    val folder = SharedFiles.folder(context)
-                    folder.listFiles()?.forEach { if (System.currentTimeMillis() - it.lastModified() > 3_600_000) it.delete() }
-                    val file = java.io.File(folder, from.name)
-                    from.copyTo(file, overwrite = true)
-                    val send = Intent(Intent.ACTION_SEND).apply {
-                        type = "image/png"
-                        putExtra(Intent.EXTRA_STREAM, SharedFiles.uriOf(context, file))
-                        call.argument<String>("text")?.let { putExtra(Intent.EXTRA_TEXT, it) }
-                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    picking = result
+                    pickingFor = "file"
+                    val pick = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        type = "*/*"
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/json", "text/plain", "application/octet-stream"))
                     }
-                    val chooser = Intent.createChooser(send, null).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                    val here = activity?.activity
-                    if (here != null) here.startActivity(chooser) else context.startActivity(chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                    result.success(true)
+                    try {
+                        here.startActivityForResult(pick, PICK_PICTURE)
+                    } catch (e: android.content.ActivityNotFoundException) {
+                        picking = null // a phone without a files app
+                        result.success(null)
+                    }
                 }
             }
             "pickPicture" -> {

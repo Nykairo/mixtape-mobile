@@ -11,8 +11,8 @@ import android.provider.OpenableColumns
 import java.io.File
 
 /**
- * Hands a picture Mixtape made (the Rewind card) to the app it's shared with, read-only and only for
- * that one share. The pictures wait in the cache's "shared" folder; nothing else can be reached
+ * Hands a file Mixtape made (the Rewind card, the library) to the app it's shared with, read-only and
+ * only for that one share. The files wait in the cache's "shared" folder; nothing else can be reached
  * through here. Small on purpose: androidx's FileProvider would do the same and bring a library along.
  */
 class SharedFiles : ContentProvider() {
@@ -31,7 +31,11 @@ class SharedFiles : ContentProvider() {
         return ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY)
     }
 
-    override fun getType(uri: Uri): String = if (uri.lastPathSegment?.endsWith(".png") == true) "image/png" else "application/octet-stream"
+    override fun getType(uri: Uri): String = when (uri.lastPathSegment?.substringAfterLast('.')) {
+        "png" -> "image/png"
+        "json" -> "application/json"
+        else -> "application/octet-stream"
+    }
 
     override fun query(uri: Uri, projection: Array<out String>?, selection: String?, args: Array<out String>?, order: String?): Cursor? {
         val f = fileOf(uri) ?: return null

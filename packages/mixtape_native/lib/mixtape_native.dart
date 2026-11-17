@@ -82,6 +82,30 @@ class MixtapeNative {
     }
   }
 
+  /// Hands a file (the library, say) to the phone's share sheet: sent to someone, kept in the files,
+  /// or carried to the computer. False where there's no share sheet for it.
+  static Future<bool> shareFile(String path, {String mime = 'application/octet-stream', String text = ''}) async {
+    try {
+      return await _channel.invokeMethod<bool>('shareFile', {'path': path, 'mime': mime, 'text': text}) ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
+  /// A file picked from the phone (a library to take in), copied where the app can read it: its path,
+  /// or null when nothing was picked.
+  static Future<String?> pickFile() async {
+    try {
+      return await _channel.invokeMethod<String>('pickFile');
+    } on MissingPluginException {
+      return null;
+    } on PlatformException {
+      return null;
+    }
+  }
+
   /// A picture picked from the phone, made into a profile picture: its middle square, 256 pixels, a
   /// JPEG in base64. Null when nothing was picked, or where there's no picker.
   static Future<String?> pickPicture() async {
