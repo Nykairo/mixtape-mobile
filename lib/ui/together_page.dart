@@ -647,7 +647,14 @@ class _Along extends StatelessWidget {
             child: Text('Pause, skip or pick a song and the music is yours again.',
                 style: Look.ui(12.5, weight: FontWeight.w600, color: Look.bg, height: 1.3)),
           ),
-          const SizedBox(width: 10),
+          const SizedBox(width: 8),
+          IconButton(
+            tooltip: 'Catch up',
+            style: IconButton.styleFrom(backgroundColor: Look.bg.withValues(alpha: 0.18), foregroundColor: Look.bg),
+            onPressed: () => t.catchUp().catchError((Object _) {}),
+            icon: const Icon(Icons.sync_rounded),
+          ),
+          const SizedBox(width: 6),
           FilledButton(
             style: FilledButton.styleFrom(backgroundColor: Look.bg, foregroundColor: Look.cream),
             onPressed: () => t.stopAlong(why: 'The music is yours again'),

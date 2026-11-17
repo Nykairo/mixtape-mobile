@@ -4,14 +4,18 @@
 
 import Flutter
 import PhotosUI
+import SwiftUI // Xcode 26 loses the photo picker's types next to WidgetKit unless SwiftUI is here too
 import UIKit
-#if canImport(WidgetKit)
-import WidgetKit
-#endif
 
 public class MixtapeNativePlugin: NSObject, FlutterPlugin {
-  /// The App Group the app and its widgets share.
-  static let group = "group.dev.softwarevault.mixtape"
+  /// The App Group the app and its widgets share. Sideloading tools give it a name of their own and say
+  /// which in ALTAppGroups.
+  static let group: String = {
+    if let groups = Bundle.main.object(forInfoDictionaryKey: "ALTAppGroups") as? [String], let first = groups.first {
+      return first
+    }
+    return "group.dev.softwarevault.mixtape"
+  }()
 
   private var channel: FlutterMethodChannel?
   private var picking: FlutterResult?
@@ -140,11 +144,7 @@ public class MixtapeNativePlugin: NSObject, FlutterPlugin {
     let shared = UserDefaults(suiteName: Self.group)
     if shared?.string(forKey: key) == text { return }
     shared?.set(text, forKey: key)
-    #if canImport(WidgetKit)
-    if #available(iOS 14.0, *) {
-      WidgetCenter.shared.reloadAllTimelines()
-    }
-    #endif
+    HomeWidgets.redraw()
   }
 
   /// A key pressed on a widget: play, pause, next, previous, like, shuffle, or tape: and a tape's id.

@@ -166,6 +166,7 @@ class Together extends ChangeNotifier {
     friend = '$service:$name';
     friendName = '$name on ${service == 'lastfm' ? 'Last.fm' : 'ListenBrainz'}';
     _outsideKey = '';
+    _outsideAsk = () => _outsideNow(service, name, lastFmKey);
     audio.steer = steer;
     notifyListeners();
     await _outsideIs(first);
@@ -180,6 +181,19 @@ class Together extends ChangeNotifier {
 
   /// What was last looked up for an outside friend, so one song isn't looked up twice.
   String _outsideKey = '';
+  Future<OutsideSong?> Function()? _outsideAsk;
+
+  /// Back to exactly where the friend is, right now (after the phone fell behind on a slow connection).
+  Future<void> catchUp() async {
+    if (friend.isEmpty) return;
+    final ask = _outsideAsk;
+    if (friend.contains(':') && ask != null) {
+      _outsideKey = ''; // the same song again, from where they are in it now
+      await _outsideIs(await ask());
+    } else {
+      await _askFriend();
+    }
+  }
 
   static Future<OutsideSong?> _outsideNow(String service, String name, String key) =>
       service == 'lastfm' ? Scrobbler.lastFmNow(name, key) : Scrobbler.listenBrainzNow(name);
@@ -219,6 +233,7 @@ class Together extends ChangeNotifier {
     _friendCh = null;
     friend = '';
     friendNow = null;
+    _outsideAsk = null;
     if (room == null) audio.steer = null;
     if (why.isNotEmpty) notices.add(why);
     notifyListeners();

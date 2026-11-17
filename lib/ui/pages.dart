@@ -463,6 +463,45 @@ class MixView extends StatelessWidget {
   }
 }
 
+/// A mix that has to be asked for first (songs like one song): the page is there right away, the songs
+/// when they come.
+class LoadingMix extends StatefulWidget {
+  const LoadingMix({super.key, required this.title, required this.load, this.slot = 0});
+
+  final String title;
+  final int slot;
+  final Future<List<Track>> Function() load;
+
+  @override
+  State<LoadingMix> createState() => _LoadingMixState();
+}
+
+class _LoadingMixState extends State<LoadingMix> {
+  late Future<List<Track>> _songs = widget.load();
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Track>>(
+      future: _songs,
+      builder: (context, snap) {
+        final songs = snap.data;
+        if (songs != null && songs.isNotEmpty) return MixView(title: widget.title, songs: songs, slot: widget.slot);
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: Look.bg,
+            surfaceTintColor: Colors.transparent,
+            title: Text(widget.title, style: Look.ui(17, weight: FontWeight.w700)),
+          ),
+          body: snap.connectionState != ConnectionState.done
+              ? _loading()
+              : _failed(snap.hasError ? _offline : 'Nothing like it came up this time.',
+                  () => setState(() => _songs = widget.load())),
+        );
+      },
+    );
+  }
+}
+
 /// The label paper's color of a slot, for a page's top.
 Color paperColor(int slot) => paperFor(slot).$2.isEmpty ? Look.accent : paperFor(slot).$2.first;
 
