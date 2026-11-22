@@ -52,34 +52,7 @@ class YouTube {
   static Future<Map<String, Object?>> resolve(String id) {
     final quick = _quick(id);
     if (!Platform.isAndroid) return quick;
-    final done = Completer<Map<String, Object?>>();
-    final errors = <YouTubeError>[];
-    var asking = 1;
-    var native = false;
-
-    void ok(Map<String, Object?> m) {
-      if (!done.isCompleted) done.complete(m);
-    }
-
-    void failed(Object e) {
-      asking--;
-      errors.add(e is YouTubeError ? e : YouTubeError('trouble', '$e'));
-      if (done.isCompleted) return;
-      askNative(); // (when it isn't asked yet)
-      if (asking > 0) return;
-      done.completeError(errors.firstWhere((x) => _final.contains(x.why), orElse: () => errors.last));
-    }
-
-    void askNative() {
-      if (native || done.isCompleted) return;
-      native = true;
-      asking++;
-      MixtapeNative.resolve(id).then(ok, onError: failed);
-    }
-
-    quick.then(ok, onError: failed);
-    Timer(hedge, askNative);
-    return done.future;
+    return _Race(id, quick).done.future;
   }
 
   static Future<Map<String, Object?>> _quick(String id) async {
@@ -97,5 +70,41 @@ class YouTube {
     } on InnerTubeError catch (e) {
       throw YouTubeError(e.why, e.detail);
     }
+  }
+}
+
+/// The quick way and NewPipe asked about the same song: NewPipe only when the quick way is slow or went
+/// wrong, and the first good answer plays (see YouTube.resolve).
+class _Race {
+  _Race(this.id, Future<Map<String, Object?>> quick) {
+    quick.then(_ok, onError: _failed);
+    Timer(YouTube.hedge, _askNative);
+  }
+
+  final String id;
+  final done = Completer<Map<String, Object?>>();
+  final _errors = <YouTubeError>[];
+  var _asking = 1;
+  var _native = false;
+
+  void _ok(Map<String, Object?> m) {
+    if (!done.isCompleted) done.complete(m);
+  }
+
+  void _failed(Object e) {
+    _asking--;
+    _errors.add(e is YouTubeError ? e : YouTubeError('trouble', '$e'));
+    if (done.isCompleted) return;
+    _askNative(); // (when it isn't asked yet)
+    if (_asking > 0) return;
+    // both went wrong: a reason about the song itself tells the most
+    done.completeError(_errors.firstWhere((x) => YouTube._final.contains(x.why), orElse: () => _errors.last));
+  }
+
+  void _askNative() {
+    if (_native || done.isCompleted) return;
+    _native = true;
+    _asking++;
+    MixtapeNative.resolve(id).then(_ok, onError: _failed);
   }
 }
