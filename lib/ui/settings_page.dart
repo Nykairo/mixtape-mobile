@@ -317,14 +317,21 @@ class SettingsPage extends StatelessWidget {
 /// maker adds a battery manager of its own, where to let Mixtape off there too.
 /// Crossfade: on or off, how long the two songs overlap (a drawing of the two volumes shows it), the
 /// shape of the blend, and whether an album's songs run into each other as they were made.
-class _Crossfade extends StatelessWidget {
+class _Crossfade extends StatefulWidget {
   const _Crossfade();
+
+  @override
+  State<_Crossfade> createState() => _CrossfadeState();
+}
+
+class _CrossfadeState extends State<_Crossfade> {
+  double? _held; // the length while the slider is dragged: kept here, saved when it's let go
 
   @override
   Widget build(BuildContext context) {
     final set = App.settings;
     final on = set.crossfade > 0;
-    final secs = on ? set.crossfade : set.crossfadeWas;
+    final secs = _held ?? (on ? set.crossfade : set.crossfadeWas);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       SwitchListTile(
         value: on,
@@ -353,7 +360,12 @@ class _Crossfade extends StatelessWidget {
                 divisions: ((longestFade - 1) * 2).round(),
                 activeColor: Look.accent,
                 label: '${_secs(secs)} s',
-                onChanged: (v) => set.setCrossfade(seconds: v),
+                // only this setting moves while dragging; the rest of the page waits for the let go
+                onChanged: (v) => setState(() => _held = v),
+                onChangeEnd: (v) {
+                  _held = null;
+                  set.setCrossfade(seconds: v);
+                },
               ),
             ),
             SizedBox(

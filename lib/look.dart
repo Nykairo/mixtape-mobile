@@ -45,7 +45,11 @@ class Look {
   static TextStyle hand(double size, {Color color = ink}) =>
       TextStyle(fontFamily: 'Covered By Your Grace', fontSize: size, color: color, height: 1.0);
 
-  static ThemeData theme() {
+  /// The app's theme for the stock that's on, made once per stock (working out the colors takes a while).
+  static ThemeData theme() => _themes[stock] ??= _theme();
+  static final _themes = <String, ThemeData>{};
+
+  static ThemeData _theme() {
     final scheme = ColorScheme.fromSeed(
       seedColor: accent,
       brightness: Brightness.dark,

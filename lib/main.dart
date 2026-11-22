@@ -163,9 +163,11 @@ class _MixtapeAppState extends State<MixtapeApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    return ListenableBuilder(
-      listenable: App.settings,
-      builder: (context, _) => MaterialApp(
+    // only the tape stock colors the whole app: other settings leave it be (a slider dragged in the
+    // settings would otherwise redraw every page with each step)
+    return ValueListenableBuilder<String>(
+      valueListenable: App.settings.look,
+      builder: (context, stock, _) => MaterialApp(
         title: 'Mixtape',
         debugShowCheckedModeBanner: false,
         theme: Look.theme(),

@@ -26,6 +26,11 @@ const cardKeyNames = {
 
 class Settings extends ChangeNotifier {
   String get stock => Look.stock;
+
+  /// The tape stock alone, for what has to be drawn anew when it changes (the whole app's colors), so
+  /// that moving any other setting doesn't redraw everything.
+  final look = ValueNotifier<String>(Look.stock);
+
   bool autoplay = true;
 
   /// Friends with a Mixtape Account can listen along with what plays here.
@@ -91,7 +96,7 @@ class Settings extends ChangeNotifier {
     final j = await Store.the.read(_file);
     if (j is Map) {
       final s = j['stock'];
-      if (s is String && Look.stocks.containsKey(s)) Look.stock = s;
+      if (s is String && Look.stocks.containsKey(s)) Look.stock = look.value = s;
       autoplay = j['autoplay'] != false;
       shareListening = j['share_listening'] != false;
       crossfade = fadeSecondsOf(j['crossfade']);
@@ -124,7 +129,7 @@ class Settings extends ChangeNotifier {
 
   void setStock(String name) {
     if (!Look.stocks.containsKey(name) || name == Look.stock) return;
-    Look.stock = name;
+    Look.stock = look.value = name;
     _save.soon();
     notifyListeners();
   }
