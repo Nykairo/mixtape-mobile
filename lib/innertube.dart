@@ -131,6 +131,18 @@ class InnerTube {
         'tunerSettingValue': 'AUTOMIX_SETTING_NORMAL',
       }, _musicHeaders);
 
+  /// A search on youtube.com itself, videos only (the filter yt-dlp sends too).
+  Future<Map<String, Object?>> webSearchRaw(String query) => _post('$_web/search?prettyPrint=false', {
+        'context': {
+          'client': {'clientName': 'WEB', 'clientVersion': '2.20251105.01.00', 'hl': language, 'gl': country},
+        },
+        'query': query,
+        'params': 'EgIQAQ%3D%3D',
+      }, {
+        'User-Agent': _browserAgent,
+        'Origin': 'https://www.youtube.com',
+      });
+
   /// The "most replayed" curve under a video on youtube.com: (start, length, how much, 0 to 1), in
   /// seconds. Empty when the video has none (too few views).
   Future<List<(double, double, double)>> mostReplayed(String videoId) async {

@@ -37,6 +37,7 @@ final _notTheVideo = RegExp(
     r'sub espa[nñ]ol|letra|reverb|loop|hour)\b',
     caseSensitive: false);
 final _hasFeat = RegExp(r'\b(feat|ft|featuring)\b', caseSensitive: false);
+final _saysVideo = RegExp(r'official (music )?video|music video|\bmv\b', caseSensitive: false);
 
 /// A title or a name for comparing: without bracketed bits, featured artists and "- Remastered".
 String plainName(String text) {
@@ -57,11 +58,14 @@ Set<String> _words(String s) => {for (final m in _notTheVideo.allMatches(s)) m.g
 /// (no lyric video, live take or cover) with the song's name, at most [longer] seconds longer than the
 /// song. The same version comes first (no extra "feat."), then one that calls itself the official
 /// video, then the most watched.
-List<Item> pickVideos(List<Item> rows, String title, String artist, int dur, {int longer = longest}) {
+///
+/// With [loose], the artist's lyric videos and visualizers count too: the same recording with something
+/// to watch, for songs that have no video of their own.
+List<Item> pickVideos(List<Item> rows, String title, String artist, int dur, {int longer = longest, bool loose = false}) {
   final name = plainName(title);
   final who = plainName(artist.split(',').first);
   if (name.isEmpty || who.isEmpty) return const [];
-  final own = _words(title);
+  final own = {..._words(title), if (loose) ...const {'lyric', 'lyrics', 'visualizer', 'visualiser'}};
   final found = <(bool, bool, double, Item)>[];
   for (final r in rows) {
     if (r.kind != Kind.video && r.kind != Kind.song) continue;
@@ -70,11 +74,14 @@ List<Item> pickVideos(List<Item> rows, String title, String artist, int dur, {in
     var shown = r.title;
     final dash = shown.indexOf(' - ');
     if (dash > 0 && plainName(shown.substring(0, dash)).contains(who)) shown = shown.substring(dash + 3);
-    if (plainName(shown) != name) continue;
-    if (_words(shown).difference(own).isNotEmpty) continue;
-    if (dur > 0 && r.dur > 0 && (r.dur - dur < -short || r.dur - dur > longer)) continue;
+    final words = _words(shown);
     final same = _hasFeat.hasMatch(shown) == _hasFeat.hasMatch(title);
-    final said = RegExp(r'official (music )?video|music video|\bmv\b', caseSensitive: false).hasMatch(shown);
+    final said = _saysVideo.hasMatch(shown);
+    // "Song | Official Music Video": what comes after the bar is no part of the name
+    final bar = shown.indexOf(' | ');
+    if (bar > 0 && !title.contains(' | ')) shown = shown.substring(0, bar);
+    if (plainName(shown) != name || words.difference(own).isNotEmpty) continue;
+    if (dur > 0 && r.dur > 0 && (r.dur - dur < -short || r.dur - dur > longer)) continue;
     found.add((same, said, r.views, r));
   }
   found.sort((a, b) {
@@ -113,13 +120,35 @@ class Videos {
     }
   }
 
+  /// The videos that could go with a song, best first: its official music video on YouTube Music, else
+  /// the artist's lyric video or visualizer there, else the same from youtube.com itself (the artist's own
+  /// channel, or their VEVO), where more videos are than YouTube Music shows.
+  static Future<List<Item>> _candidates(Track t) async {
+    final artist = t.artist.split(',').first.trim();
+    final query = '${t.title} $artist';
+    final music = (await Music.search(query, filter: 'videos')).items;
+    for (final loose in [false, true]) {
+      final picked = pickVideos(music, t.title, t.artist, t.dur, loose: loose);
+      if (picked.isNotEmpty) return picked;
+    }
+    List<Item> web;
+    try {
+      web = await Music.webVideos('$artist ${t.title}');
+    } on Object {
+      return const [];
+    }
+    for (final loose in [false, true]) {
+      final picked = pickVideos(web, t.title, t.artist, t.dur, loose: loose);
+      if (picked.isNotEmpty) return picked;
+    }
+    return const [];
+  }
+
   static Future<MusicVideo?> _look(Track t) async {
     MusicVideo? got;
     if (t.src == 'yt') {
-      final artist = t.artist.split(',').first.trim();
-      final results = await Music.search('${t.title} $artist', filter: 'videos');
       var dur = t.dur;
-      for (final v in pickVideos(results.items, t.title, t.artist, dur).take(3)) {
+      for (final v in (await _candidates(t)).take(3)) {
         if (dur <= 0) dur = v.dur; // (a song whose length isn't known yet: no way to check)
         final extra = v.dur > 0 && dur > 0 ? v.dur - dur : 0;
         int? lead;

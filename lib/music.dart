@@ -269,6 +269,13 @@ class Music {
       _kept('n:$videoId:$playlist', const Duration(minutes: 20),
           () async => parseNext(await _yt.nextRaw(videoId, playlist: playlist, params: params), videoId));
 
+  /// Videos on youtube.com itself (not YouTube Music) for a search, as items: the channel as the artist
+  /// (without "VEVO"), and official when YouTube marks the channel as the artist's own.
+  static Future<List<Item>> webVideos(String query) => _kept('w:$query', const Duration(hours: 6), () async {
+        final data = await _guard(() => _yt.webSearchRaw(query));
+        return parseWebVideos(data);
+      });
+
   static Future<List<Shelf>> related(String relatedId) =>
       _kept('r:$relatedId', const Duration(hours: 1), () async => parseShelves(await _yt.browseRaw(relatedId)));
 }
@@ -770,4 +777,27 @@ WatchNext parseNext(Map<String, Object?> data, String videoId) {
     if (id.startsWith('MPTR')) related = id;
   }
   return WatchNext(songs, lyrics: lyrics, related: related);
+}
+
+/// The videos in a youtube.com search answer (see Music.webVideos).
+List<Item> parseWebVideos(Map<String, Object?> data) {
+  final out = <Item>[];
+  for (final v in findAll(data, 'videoRenderer')) {
+    final id = '${v['videoId'] ?? ''}';
+    if (id.isEmpty) continue;
+    final channel = textOf(v['ownerText'] ?? v['longBylineText']);
+    final badges = [for (final b in asList(v['ownerBadges'])) '${findOne(b, 'metadataBadgeRenderer')['style'] ?? ''}'];
+    final length = textOf(v['lengthText']);
+    out.add(Item(
+      kind: Kind.video,
+      id: id,
+      title: textOf(v['title']),
+      artist: channel.replaceAll(RegExp(r'\s*VEVO$|\s+-\s+Topic$'), '').trim(),
+      dur: isClock(length) ? clockSeconds(length) : 0,
+      views: countValue(textOf(v['viewCountText'])),
+      official: badges.contains('BADGE_STYLE_TYPE_VERIFIED_ARTIST'),
+      art: 'https://i.ytimg.com/vi/$id/hqdefault.jpg',
+    ));
+  }
+  return out;
 }
