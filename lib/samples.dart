@@ -77,7 +77,10 @@ class Samples extends ChangeNotifier {
   String? trouble;
 
   final _client = http.Client();
-  final _players = [AudioPlayer(useProxyForRequestHeaders: false), AudioPlayer(useProxyForRequestHeaders: false)];
+  final _players = [
+    AudioPlayer(useProxyForRequestHeaders: false, audioLoadConfiguration: quickStart),
+    AudioPlayer(useProxyForRequestHeaders: false, audioLoadConfiguration: quickStart),
+  ];
   final _loaded = <String?>[null, null]; // the song each player has (or is getting)
   final _loading = <Future<void>?>[null, null];
   int _on = 0; // which player plays

@@ -1,7 +1,9 @@
-/// YouTube for the rest of the app. On Android NewPipe's extractor does the work (packages/mixtape_native)
-/// and InnerTube steps in when it can't; on the iPhone InnerTube does it all.
+/// YouTube for the rest of the app. InnerTube asks YouTube Music for everything it shows and finds where
+/// songs stream from; on Android NewPipe's extractor (packages/mixtape_native) searches and stands by for
+/// the streams. On the iPhone InnerTube does it all.
 library;
 
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -39,24 +41,61 @@ class YouTube {
     }
   }
 
-  /// Where a song's audio streams from right now (see MixtapeNative.resolve for the keys).
-  static Future<Map<String, Object?>> resolve(String id) async {
-    YouTubeError? first;
-    if (Platform.isAndroid) {
-      try {
-        return await MixtapeNative.resolve(id);
-      } on YouTubeError catch (e) {
-        if (_final.contains(e.why)) rethrow;
-        first = e;
-      }
+  /// How long the quick way gets before NewPipe is asked as well.
+  static const hedge = Duration(milliseconds: 900);
+
+  /// Where a song's audio streams from right now (see MixtapeNative.resolve for the keys; 'related' may
+  /// be missing, see Links.relatedOf). The visionOS app's request goes first: one small answer, mostly
+  /// back in a few tenths of a second. On Android NewPipe's extractor is asked as well when that hasn't
+  /// answered within [hedge], or went wrong; the first good answer plays. When both go wrong, the more
+  /// telling reason comes back (one about the song itself).
+  static Future<Map<String, Object?>> resolve(String id) {
+    final quick = _quick(id);
+    if (!Platform.isAndroid) return quick;
+    final done = Completer<Map<String, Object?>>();
+    final errors = <YouTubeError>[];
+    var asking = 1;
+    var native = false;
+
+    void ok(Map<String, Object?> m) {
+      if (!done.isCompleted) done.complete(m);
     }
+
+    void failed(Object e) {
+      asking--;
+      errors.add(e is YouTubeError ? e : YouTubeError('trouble', '$e'));
+      if (done.isCompleted) return;
+      askNative(); // (when it isn't asked yet)
+      if (asking > 0) return;
+      done.completeError(errors.firstWhere((x) => _final.contains(x.why), orElse: () => errors.last));
+    }
+
+    void askNative() {
+      if (native || done.isCompleted) return;
+      native = true;
+      asking++;
+      MixtapeNative.resolve(id).then(ok, onError: failed);
+    }
+
+    quick.then(ok, onError: failed);
+    Timer(hedge, askNative);
+    return done.future;
+  }
+
+  static Future<Map<String, Object?>> _quick(String id) async {
     try {
-      return await inner.resolve(id);
+      return await inner.resolve(id, withRelated: false);
     } on InnerTubeError catch (e) {
-      // when both went wrong, the more telling answer: a reason about the song itself, or else the
-      // first one (from the way that usually works)
-      if (first == null || _final.contains(e.why)) throw YouTubeError(e.why, e.detail);
-      throw first;
+      throw YouTubeError(e.why, e.detail);
+    }
+  }
+
+  /// Songs like this one (a radio from it), for when the queue runs out.
+  static Future<List<Map<String, Object?>>> related(String id) async {
+    try {
+      return await inner.related(id);
+    } on InnerTubeError catch (e) {
+      throw YouTubeError(e.why, e.detail);
     }
   }
 }

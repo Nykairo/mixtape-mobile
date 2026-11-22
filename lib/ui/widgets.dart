@@ -12,6 +12,7 @@ import 'package:flutter/services.dart';
 import 'package:mixtape_native/mixtape_native.dart';
 
 import '../app.dart';
+import '../audio.dart' show Links;
 import '../cassette.dart';
 import '../look.dart';
 import '../model.dart';
@@ -237,6 +238,8 @@ class SongRow extends StatelessWidget {
     ].join('  ·  ');
     return InkWell(
       onTap: can ? onTap : () => say(context, "That song is a file on a computer, it doesn't play on the phone."),
+      // a finger on a song is mostly a song about to play: its address is looked up already
+      onTapDown: can ? (_) => Links.warm(track) : null,
       onLongPress: () => songMenu(context, track, tape: tape, index: index),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 7, 4, 7),

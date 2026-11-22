@@ -42,6 +42,16 @@ class Link {
   final int bytesPerSecond;
 
   bool get fresh => expires - _seconds() > 300;
+
+  Map<String, Object?> toJson() =>
+      {'url': '$url', 'agent': agent, 'mime': mime, 'length': length, 'expires': expires, 'bps': bytesPerSecond};
+
+  static Link? fromJson(Map<Object?, Object?> j) {
+    final url = Uri.tryParse('${j['url'] ?? ''}');
+    if (url == null || !url.hasScheme) return null;
+    int n(Object? v) => v is int ? v : -1;
+    return Link(url, '${j['agent'] ?? ''}', '${j['mime'] ?? 'audio/mp4'}', n(j['length']), n(j['expires']), n(j['bps']) * 8);
+  }
 }
 
 /// Looks up and remembers where songs stream from, and the songs YouTube calls like them.
@@ -52,6 +62,23 @@ class Links {
 
   /// Why a song wouldn't play, by YouTube id: age, region, private, members, busy, gone, network, trouble.
   static final trouble = <String, String>{};
+
+  static final _keep = LaterSave('links.json', () => {
+        for (final e in _links.entries)
+          if (e.value.expires - _seconds() > 1800) e.key: e.value.toJson(),
+      });
+
+  /// The addresses kept from the last time Mixtape ran (they hold for a few hours), so the first song
+  /// after the start plays at once. One YouTube no longer takes is simply asked for anew.
+  static Future<void> load() async {
+    final j = await Store.the.read('links.json');
+    if (j is! Map) return;
+    for (final e in j.entries) {
+      final v = e.value;
+      final link = v is Map ? Link.fromJson(v) : null;
+      if (link != null && link.fresh) _links.putIfAbsent('${e.key}', () => link);
+    }
+  }
 
   static Future<Link> get(String id, {bool fresh = false}) {
     final have = _links[id];
@@ -67,6 +94,18 @@ class Links {
   }
 
   static List<Track> related(String id) => _related[id] ?? const [];
+
+  /// Songs like this one: what came with its address, or else asked for (a radio from it), and kept.
+  static Future<List<Track>> relatedOf(String id) async {
+    final have = _related[id];
+    if (have != null && have.isNotEmpty) return have;
+    final found = [for (final m in await YouTube.related(id)) Track.fromYouTube(m)];
+    _related[id] = found;
+    while (_related.length > 80) {
+      _related.remove(_related.keys.first);
+    }
+    return found;
+  }
 
   static Future<Link> _look(String id) async {
     try {
@@ -85,6 +124,7 @@ class Links {
       while (_links.length > 80) {
         _links.remove(_links.keys.first);
       }
+      _keep.soon();
       while (_related.length > 80) {
         _related.remove(_related.keys.first);
       }
@@ -328,12 +368,22 @@ class QueueView {
   Track? get current => index >= 0 && index < songs.length ? songs[index] : null;
 }
 
+/// How much of a song Android's player wants before it starts: under a second instead of two and a half
+/// (the bytes come from the phone itself, through YouTubeSource, so they rarely run dry), and a little
+/// more after it ran dry once.
+const quickStart = AudioLoadConfiguration(
+  androidLoadControl: AndroidLoadControl(
+    bufferForPlaybackDuration: Duration(milliseconds: 800),
+    bufferForPlaybackAfterRebufferDuration: Duration(seconds: 3),
+  ),
+);
+
 class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   MixtapeAudio() {
     _ready = _start();
   }
 
-  final _player = AudioPlayer(useProxyForRequestHeaders: false);
+  final _player = AudioPlayer(useProxyForRequestHeaders: false, audioLoadConfiguration: quickStart);
   final _order = QueueOrder();
   final _client = http.Client();
   late final Future<void> _ready;
@@ -615,11 +665,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
     if (!autoplay || steer != null || _filling || _player.loopMode != LoopMode.off || last.src != 'yt') return;
     _filling = true;
     try {
-      var like = Links.related(last.ref);
-      if (like.isEmpty) {
-        await Links.get(last.ref);
-        like = Links.related(last.ref);
-      }
+      final like = await Links.relatedOf(last.ref);
       final have = {for (final t in _songs) t.id};
       final skip = unwanted;
       final fresh = [
@@ -1098,7 +1144,10 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
   Future<void> _readyTail(Track t, Duration from, String key) async {
     _tailReady = false;
     final tail = _tail ??= AudioPlayer(
-        useProxyForRequestHeaders: false, handleAudioSessionActivation: false, handleInterruptions: false);
+        useProxyForRequestHeaders: false,
+        handleAudioSessionActivation: false,
+        handleInterruptions: false,
+        audioLoadConfiguration: quickStart);
     try {
       await tail.setVolume(0);
       await tail.setSpeed(_player.speed);

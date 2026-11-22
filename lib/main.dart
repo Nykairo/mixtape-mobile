@@ -41,6 +41,7 @@ Future<void> main() async {
   final history = History();
   await history.load();
   await Downloads.the.load(); // before the music: saved songs play from their files
+  await Links.load(); // where songs streamed from last time: the first song starts at once
   await PhoneInfo.the.load();
   if (PhoneInfo.the.lowRam) {
     // a phone with little memory keeps fewer covers decoded (one that's needed again is fetched again)
