@@ -33,14 +33,11 @@ class MixtapeNative {
   }
 
   /// Where a song's audio streams from right now: url, mime, bitrate, length (bytes, -1 when unknown),
-  /// duration (seconds), agent (the User-Agent to fetch it with), expires (unix seconds), and related
-  /// (songs like it, as search gives them).
+  /// duration (seconds), agent (the User-Agent to fetch it with) and expires (unix seconds).
   static Future<Map<String, Object?>> resolve(String id) async {
     try {
       final got = await _channel.invokeMapMethod<String, Object?>('resolve', {'id': id});
-      final out = Map<String, Object?>.of(got ?? const {});
-      out['related'] = _maps(out['related'] as List<Object?>?);
-      return out;
+      return Map<String, Object?>.of(got ?? const {});
     } on PlatformException catch (e) {
       throw YouTubeError(e.code, e.message ?? '');
     }

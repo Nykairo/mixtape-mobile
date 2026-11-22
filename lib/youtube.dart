@@ -44,11 +44,11 @@ class YouTube {
   /// How long the quick way gets before NewPipe is asked as well.
   static const hedge = Duration(milliseconds: 900);
 
-  /// Where a song's audio streams from right now (see MixtapeNative.resolve for the keys; 'related' may
-  /// be missing, see Links.relatedOf). The visionOS app's request goes first: one small answer, mostly
-  /// back in a few tenths of a second. On Android NewPipe's extractor is asked as well when that hasn't
-  /// answered within [hedge], or went wrong; the first good answer plays. When both go wrong, the more
-  /// telling reason comes back (one about the song itself).
+  /// Where a song's audio streams from right now (see MixtapeNative.resolve for the keys). The visionOS
+  /// app's request goes first: one small answer, mostly back in a few tenths of a second. On Android
+  /// NewPipe's extractor is asked as well when that hasn't answered within [hedge], or went wrong; the
+  /// first good answer plays. When both go wrong, the more telling reason comes back (one about the song
+  /// itself).
   static Future<Map<String, Object?>> resolve(String id) {
     final quick = _quick(id);
     if (!Platform.isAndroid) return quick;
@@ -57,7 +57,7 @@ class YouTube {
 
   static Future<Map<String, Object?>> _quick(String id) async {
     try {
-      return await inner.resolve(id, withRelated: false);
+      return await inner.resolve(id);
     } on InnerTubeError catch (e) {
       throw YouTubeError(e.why, e.detail);
     }

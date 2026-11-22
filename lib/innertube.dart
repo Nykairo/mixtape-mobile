@@ -195,7 +195,7 @@ class InnerTube {
     final data = await nextRaw(id);
     final out = <Map<String, Object?>>[];
     final seen = <String>{id};
-    for (final item in findAll(data, 'playlistPanelVideoRenderer')) {
+    for (final item in radioItems(data, id, withSeed: false)) {
       final song = panelItem(item);
       if (song != null && seen.add('${song['id']}')) out.add(song);
     }
@@ -239,8 +239,9 @@ class InnerTube {
   }
 
   /// Where a song's audio streams from right now, in the same shape as the Android side's resolve: url,
-  /// mime, bitrate (kbit/s), length (bytes), duration (s), agent, expires (unix s), related.
-  Future<Map<String, Object?>> resolve(String id, {bool withRelated = true}) async {
+  /// mime, bitrate (kbit/s), length (bytes), duration (s), agent and expires (unix s). Songs like it are
+  /// asked for apart (related), when the queue runs out.
+  Future<Map<String, Object?>> resolve(String id) async {
     final data = await _player(id);
     final streaming = asMap(data['streamingData']);
     final formats = [
@@ -255,14 +256,6 @@ class InnerTube {
     final best = aac.isNotEmpty ? aac.first : (formats..sort((a, b) => rate(b).compareTo(rate(a)))).first;
     final url = '${best['url']}';
     final details = asMap(data['videoDetails']);
-    List<Map<String, Object?>> like = const [];
-    if (withRelated) {
-      try {
-        like = await related(id);
-      } on InnerTubeError {
-        like = const []; // the song plays all the same
-      }
-    }
     return {
       'url': url,
       'mime': '${best['mimeType']}'.split(';').first,
@@ -271,7 +264,6 @@ class InnerTube {
       'duration': toInt(details['lengthSeconds']),
       'agent': visionAgent,
       'expires': _expires(url, toInt(streaming['expiresInSeconds'])),
-      'related': like,
     };
   }
 
@@ -367,3 +359,36 @@ class InnerTube {
     return null;
   }
 }
+
+/// What a radio (a `next` answer) plays, in its order: the song where YouTube Music has one next to a
+/// music video, and no uploads of other people or podcast episodes. The entry the radio started from
+/// ([videoId], or its song) stays whatever it is, or goes with [withSeed] false.
+List<Map<String, Object?>> radioItems(Map<String, Object?> data, String videoId, {bool withSeed = true}) {
+  final entries = asList(findOne(data, 'playlistPanelRenderer')['contents']);
+  final out = <Map<String, Object?>>[];
+  for (final e in entries.isEmpty ? findAll(data, 'playlistPanelVideoRenderer').map((r) => {'playlistPanelVideoRenderer': r}) : entries) {
+    final wrap = asMap(asMap(e)['playlistPanelVideoWrapperRenderer']);
+    var item = asMap(asMap(e)['playlistPanelVideoRenderer']);
+    final ids = {'${item['videoId'] ?? ''}'};
+    if (wrap.isNotEmpty) {
+      item = asMap(asMap(wrap['primaryRenderer'])['playlistPanelVideoRenderer']);
+      ids.add('${item['videoId'] ?? ''}');
+      Map<String, Object?>? song;
+      for (final c in asList(wrap['counterpart'])) {
+        final other = asMap(asMap(asMap(c)['counterpartRenderer'])['playlistPanelVideoRenderer']);
+        ids.add('${other['videoId'] ?? ''}');
+        if (song == null && _musicVideoType(other) == 'MUSIC_VIDEO_TYPE_ATV') song = other;
+      }
+      if (song != null) item = song;
+    }
+    if (item.isEmpty) continue;
+    final seed = ids.contains(videoId);
+    if (seed && !withSeed) continue;
+    final type = _musicVideoType(item);
+    if (!seed && (type == 'MUSIC_VIDEO_TYPE_UGC' || type == 'MUSIC_VIDEO_TYPE_PODCAST_EPISODE')) continue;
+    out.add(item);
+  }
+  return out;
+}
+
+String _musicVideoType(Object? node) => '${findOne(node, 'watchEndpointMusicConfig')['musicVideoType'] ?? ''}';

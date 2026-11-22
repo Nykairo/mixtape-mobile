@@ -54,7 +54,6 @@ object YouTube {
         val best = plain.filter { it.format == MediaFormat.M4A }.maxByOrNull { it.averageBitrate }
             ?: plain.maxByOrNull { it.averageBitrate }
             ?: throw IOException("no plain audio stream")
-        val related = info.relatedItems.mapNotNull { song(it) }.take(25)
         return mapOf(
             "url" to best.content,
             "mime" to (best.format?.mimeType ?: "audio/mp4"),
@@ -63,7 +62,6 @@ object YouTube {
             "duration" to info.duration,
             "agent" to YoutubeParsingHelper.getVisionOsUserAgent(null),
             "expires" to expiry(best.content),
-            "related" to related,
         )
     }
 

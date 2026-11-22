@@ -89,14 +89,23 @@ jobs:
 
       - run: flutter pub get
 
+      # Robolectric fetches its Android jar from Maven Central on the first run, and that fetch fails now
+      # and then; kept here, it is fetched once.
+      - name: Keep Robolectric's Android jar
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository/org/robolectric
+          key: robolectric-${{ hashFiles('packages/mixtape_native/android/build.gradle.kts') }}
+
       - name: The widgets, drawn
         env:
           WIDGET_PICTURES: ${{ github.workspace }}/widget-pictures
           WIDGET_FONT: ${{ github.workspace }}/assets/fonts/CoveredByYourGrace.ttf
         run: |
           cd android
-          ./gradlew :mixtape_native:testDebugUnitTest --tests '*WidgetPicturesTest*' --console=plain > widgets.log 2>&1 \
-            || { tail -80 widgets.log; exit 1; }
+          draw() { ./gradlew :mixtape_native:testDebugUnitTest --tests '*WidgetPicturesTest*' --console=plain > widgets.log 2>&1; }
+          # a second go only when the jar couldn't be fetched, not when a widget is wrong
+          draw || { grep -q MavenArtifactFetcher widgets.log && draw; } || { tail -80 widgets.log; exit 1; }
           grep -E "picture:|PASSED|FAILED|BUILD" widgets.log | head -40
 
       - name: Onto the widgets branch

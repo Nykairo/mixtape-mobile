@@ -54,7 +54,7 @@ class Link {
   }
 }
 
-/// Looks up and remembers where songs stream from, and the songs YouTube calls like them.
+/// Looks up and remembers where songs stream from, and the songs YouTube Music calls like them.
 class Links {
   static final _links = <String, Link>{};
   static final _asking = <String, Future<Link>>{};
@@ -93,9 +93,7 @@ class Links {
     if (t.src == 'yt') get(t.ref).ignore();
   }
 
-  static List<Track> related(String id) => _related[id] ?? const [];
-
-  /// Songs like this one: what came with its address, or else asked for (a radio from it), and kept.
+  /// Songs like this one: YouTube Music's radio from it (songs, not videos; see radioItems), kept.
   static Future<List<Track>> relatedOf(String id) async {
     final have = _related[id];
     if (have != null && have.isNotEmpty) return have;
@@ -113,21 +111,11 @@ class Links {
       final link = Link(Uri.parse('${m['url']}'), '${m['agent'] ?? ''}', '${m['mime'] ?? 'audio/mp4'}',
           _int(m['length']), _int(m['expires']), _int(m['bitrate']));
       _links[id] = link;
-      final rel = m['related'];
-      if (rel is List) {
-        _related[id] = [
-          for (final x in rel)
-            if (x is Map) Track.fromYouTube(Map<String, Object?>.from(x)),
-        ];
-      }
       trouble.remove(id);
       while (_links.length > 80) {
         _links.remove(_links.keys.first);
       }
       _keep.soon();
-      while (_related.length > 80) {
-        _related.remove(_related.keys.first);
-      }
       return link;
     } on YouTubeError catch (e) {
       trouble[id] = e.why;
@@ -472,6 +460,10 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
       if (!playing) _endBlend(); // a call or a headset pulled out: the end of the last song goes quiet too
       if (playing) {
         _heardClock.start();
+        // the last song plays (and not just waits there, as after a restart): songs like it go on after it
+        final t = current;
+        final view = this.view;
+        if (t != null && view.index + 1 >= view.songs.length) _keepGoing(t);
       } else {
         _heardClock.stop();
         _saveSession();
@@ -655,7 +647,7 @@ class MixtapeAudio extends BaseAudioHandler with QueueHandler, SeekHandler {
           if (current?.id == t.id && _player.playing) Heads.read(next, _client).ignore();
         });
       }
-    } else {
+    } else if (_player.playing) {
       _keepGoing(t);
     }
   }

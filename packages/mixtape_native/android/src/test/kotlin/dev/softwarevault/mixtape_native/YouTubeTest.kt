@@ -20,9 +20,8 @@ class YouTubeTest {
 
         val id = found.first()["id"] as String
         val song = YouTube.resolve(id)
-        val related = song["related"] as List<*>
         println("resolve: ${song["mime"]}, ${song["bitrate"]} kbit/s, ${song["length"]} bytes, ${song["duration"]} s, " +
-            "${related.size} songs like it, until ${song["expires"]}")
+            "until ${song["expires"]}")
 
         val conn = URL(song["url"] as String).openConnection() as HttpURLConnection
         conn.setRequestProperty("Range", "bytes=0-65535")

@@ -721,37 +721,10 @@ List<Shelf> parseShelves(Map<String, Object?> data) => _shelvesIn(data['contents
 /// A radio's songs as they should play: where YouTube Music puts a song next to a music video, the song
 /// (no intro, no skit, the album's sound); uploads of other people and podcast episodes stay out (only
 /// the song the radio started from stays, whatever it is).
-List<Map<String, Object?>> _radioItems(Map<String, Object?> data, String videoId) {
-  final entries = asList(findOne(data, 'playlistPanelRenderer')['contents']);
-  if (entries.isEmpty) return findAll(data, 'playlistPanelVideoRenderer').toList();
-  final out = <Map<String, Object?>>[];
-  for (final e in entries) {
-    final wrap = asMap(asMap(e)['playlistPanelVideoWrapperRenderer']);
-    var item = asMap(asMap(e)['playlistPanelVideoRenderer']);
-    if (wrap.isNotEmpty) {
-      item = asMap(asMap(wrap['primaryRenderer'])['playlistPanelVideoRenderer']);
-      for (final c in asList(wrap['counterpart'])) {
-        final other = asMap(asMap(asMap(c)['counterpartRenderer'])['playlistPanelVideoRenderer']);
-        if (_videoType(other) == 'MUSIC_VIDEO_TYPE_ATV') {
-          item = other;
-          break;
-        }
-      }
-    }
-    if (item.isEmpty) continue;
-    final type = _videoType(item);
-    if ((type == 'MUSIC_VIDEO_TYPE_UGC' || type == 'MUSIC_VIDEO_TYPE_PODCAST_EPISODE') && item['videoId'] != videoId) {
-      continue;
-    }
-    out.add(item);
-  }
-  return out;
-}
-
 WatchNext parseNext(Map<String, Object?> data, String videoId) {
   final songs = <Track>[];
   final seen = <String>{};
-  for (final item in _radioItems(data, videoId)) {
+  for (final item in radioItems(data, videoId)) {
     final m = InnerTube.panelItem(item);
     if (m == null || !seen.add('${m['id']}')) continue;
     final runs = _linked(item['longBylineText']);

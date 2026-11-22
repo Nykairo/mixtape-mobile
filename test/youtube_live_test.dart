@@ -23,8 +23,7 @@ void main() {
     final found = await tube.search('daft punk get lucky');
     final song = await tube.resolve('${found.first['id']}');
     // ignore: avoid_print
-    print('resolve: ${song['mime']}, ${song['bitrate']} kbit/s, ${song['length']} bytes, '
-        '${(song['related'] as List).length} songs like it');
+    print('resolve: ${song['mime']}, ${song['bitrate']} kbit/s, ${song['length']} bytes');
     final res = await http.get(Uri.parse('${song['url']}'),
         headers: {'Range': 'bytes=0-65535', 'User-Agent': '${song['agent']}'});
     // ignore: avoid_print
