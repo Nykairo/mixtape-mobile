@@ -62,6 +62,14 @@ public class MixtapeNativePlugin: NSObject, FlutterPlugin {
       // a video over the whole screen: the screen stays on while it shows
       UIApplication.shared.isIdleTimerDisabled = args["on"] as? Bool ?? false
       result(nil)
+    case "openUrl":
+      // a page in the browser (where some lyrics came from)
+      guard let url = URL(string: args["url"] as? String ?? ""), url.scheme == "https" else {
+        result(false)
+        return
+      }
+      UIApplication.shared.open(url)
+      result(true)
     case "pickMusic":
       pickMusic(result)
     case "openedMusic":

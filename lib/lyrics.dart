@@ -17,13 +17,16 @@ import 'music.dart';
 import 'youtube.dart';
 
 class Lyrics {
-  const Lyrics(this.lines, {this.times = const [], this.source = ''});
+  const Lyrics(this.lines, {this.times = const [], this.source = '', this.link = ''});
 
   final List<String> lines;
 
   /// When each line starts, in milliseconds (empty for plain words).
   final List<int> times;
   final String source;
+
+  /// The page the words came from, where the source asks to be linked (Megalobiz).
+  final String link;
 
   bool get synced => times.isNotEmpty;
 
@@ -273,7 +276,7 @@ class LyricsFinder {
         // on to the next ones
       }
     }
-    for (final synced in [_netease, _kugou]) {
+    for (final synced in [_megalobiz, _netease, _kugou, _qq]) {
       try {
         final l = await synced(title, artist, t.dur);
         if (l != null) return l;
@@ -302,6 +305,82 @@ class LyricsFinder {
     if (res.statusCode != 200) return const {};
     return asMap(jsonDecode(utf8.decode(res.bodyBytes)));
   }
+
+  static const _ownAgent = {'User-Agent': 'Mixtape for phones (https://github.com/Nykairo/mixtape-mobile)'};
+
+  /// Megalobiz's free lyrics API: synced sheets found by title, artist and length. It asks to be linked
+  /// where its words show (Lyrics.link) and to be asked only for what plays: it is.
+  Future<Lyrics?> _megalobiz(String title, String artist, int dur) async {
+    final d = await _json(
+        Uri.https('api.megalobiz.com', '/api/public/v1/search', {
+          'title': title,
+          if (artist.isNotEmpty) 'artist': artist,
+          if (dur > 0) 'duration': '$dur',
+          'limit': '5',
+        }),
+        headers: _ownAgent);
+    for (final x in asList(d['results'])) {
+      final r = asMap(x);
+      final off = r['duration_diff'];
+      if (dur > 0 && off is num && off.abs() > 4) continue;
+      if (!sameSong(title, artist, 0, '${r['title'] ?? ''}', '${r['artist'] ?? ''}', 0)) continue;
+      final got = await _json(Uri.https('api.megalobiz.com', '/api/public/v1/lrc/${r['id']}'), headers: _ownAgent);
+      final rows = [
+        for (final line in asList(got['lines']))
+          if (asMap(line)['time_ms'] is int) (asMap(line)['time_ms'] as int, '${asMap(line)['text'] ?? ''}'.trim()),
+      ];
+      if (rows.isEmpty) continue;
+      return Lyrics([for (final row in rows) row.$2.isEmpty ? '♪' : row.$2],
+          times: [for (final row in rows) row.$1], source: 'Megalobiz', link: '${got['url'] ?? r['url'] ?? ''}');
+    }
+    return null;
+  }
+
+  /// QQ Music: a big catalog with synced words for songs from everywhere, not only from China.
+  Future<Lyrics?> _qq(String title, String artist, int dur) async {
+    const head = {..._browser, 'Referer': 'https://y.qq.com/'};
+    final found = await _http
+        .get(Uri.https('c.y.qq.com', '/soso/fcgi-bin/client_search_cp', {'format': 'json', 'p': '1', 'n': '8', 'w': '$title $artist'}),
+            headers: head)
+        .timeout(const Duration(seconds: 8));
+    if (found.statusCode != 200) return null;
+    final d = asMap(jsonDecode(_unwrapJsonp(utf8.decode(found.bodyBytes, allowMalformed: true))));
+    for (final x in asList(asMap(asMap(d['data'])['song'])['list']).take(8)) {
+      final song = asMap(x);
+      final who = [for (final a in asList(song['singer'])) '${asMap(a)['name'] ?? ''}'].join(' ');
+      if (!sameSong(title, artist, dur, '${song['songname'] ?? ''}', who, toInt(song['interval']))) continue;
+      final got = await _http
+          .get(Uri.https('c.y.qq.com', '/lyric/fcgi-bin/fcg_query_lyric_new.fcg',
+              {'songmid': '${song['songmid']}', 'format': 'json', 'nobase64': '1', 'g_tk': '5381'}),
+              headers: head)
+          .timeout(const Duration(seconds: 8));
+      if (got.statusCode != 200) continue;
+      final l = asMap(jsonDecode(_unwrapJsonp(utf8.decode(got.bodyBytes, allowMalformed: true))));
+      final lyrics = parseLrc(_unescapeHtml('${l['lyric'] ?? ''}'), source: 'QQ Music');
+      if (lyrics != null && lyrics.lines.any((w) => w != '♪')) return lyrics;
+    }
+    return null;
+  }
+
+  /// QQ's answers sometimes come wrapped in a callback ("MusicJsonCallback({...})").
+  static String _unwrapJsonp(String text) {
+    final t = text.trim();
+    if (t.startsWith('{') || t.startsWith('[')) return t;
+    final open = t.indexOf('(');
+    final close = t.lastIndexOf(')');
+    return open >= 0 && close > open ? t.substring(open + 1, close) : t;
+  }
+
+  static String _unescapeHtml(String text) => text
+      .replaceAll('&#58;', ':')
+      .replaceAll('&#46;', '.')
+      .replaceAll('&#32;', ' ')
+      .replaceAll('&#10;', '\n')
+      .replaceAll('&#13;', '')
+      .replaceAll('&#45;', '-')
+      .replaceAll('&#39;', "'")
+      .replaceAll('&quot;', '"')
+      .replaceAll('&amp;', '&');
 
   Future<Lyrics?> _netease(String title, String artist, int dur) async {
     final head = {..._browser, 'Referer': 'https://music.163.com/'};
@@ -385,6 +464,20 @@ class LyricsFinder {
       final rows = [for (final r in asList(jsonDecode(utf8.decode(res.bodyBytes)))) asMap(r)];
       // the same length (within a few seconds), synced words first
       rows.removeWhere((r) => dur > 0 && (toInt(r['duration']) - dur).abs() > 4);
+      if (rows.isEmpty) {
+        // the names written differently there ("Tyler, The Creator" or a guest in the title): the words of
+        // both, as free text, and the same length and title
+        final loose = Uri.https('lrclib.net', '/api/search', {'q': '$title $artist'.trim()});
+        final more = await _http.get(loose, headers: headers).timeout(const Duration(seconds: 8));
+        if (more.statusCode == 200) {
+          rows.addAll([
+            for (final r in asList(jsonDecode(utf8.decode(more.bodyBytes))))
+              if (sameSong(title, artist, dur, '${asMap(r)['trackName'] ?? ''}', '${asMap(r)['artistName'] ?? ''}',
+                  toInt(asMap(r)['duration'])))
+                asMap(r),
+          ]);
+        }
+      }
       rows.sort((a, b) => (b['syncedLyrics'] is String ? 1 : 0) - (a['syncedLyrics'] is String ? 1 : 0));
       if (rows.isNotEmpty) hit = rows.first;
     }

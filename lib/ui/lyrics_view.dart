@@ -7,6 +7,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:mixtape_native/mixtape_native.dart';
 
 import '../app.dart';
 import '../look.dart';
@@ -156,7 +157,7 @@ class _LyricsViewState extends State<LyricsView> {
                       ]),
                     ),
                 const SizedBox(height: 18),
-                if (l.source.isNotEmpty) Text('Lyrics: ${l.source}', style: Look.ui(12.5, color: Look.faint)),
+                if (l.source.isNotEmpty) _Source(l),
               ]),
             ),
           ]);
@@ -175,7 +176,7 @@ class _LyricsViewState extends State<LyricsView> {
                 if (k == l.lines.length) {
                   return Padding(
                     padding: const EdgeInsets.only(top: 20),
-                    child: Text(l.source.isEmpty ? '' : 'Lyrics: ${l.source}', style: Look.ui(12.5, color: Look.faint)),
+                    child: l.source.isEmpty ? const SizedBox.shrink() : _Source(l),
                   );
                 }
                 final on = k == line;
@@ -299,6 +300,28 @@ class _CountdownState extends State<_Countdown> {
             style: Look.ui(13.5, weight: FontWeight.w700, color: Look.cream.withValues(alpha: 0.8))
                 .copyWith(fontFeatures: const [FontFeature.tabularFigures()])),
       ]),
+    );
+  }
+}
+
+/// Where the words came from; a tap opens its page when the source has one (Megalobiz asks for that).
+class _Source extends StatelessWidget {
+  const _Source(this.lyrics);
+
+  final Lyrics lyrics;
+
+  @override
+  Widget build(BuildContext context) {
+    final line = Text('Lyrics: ${lyrics.source}',
+        style: Look.ui(12.5, color: lyrics.link.isEmpty ? Look.faint : Look.muted).copyWith(
+          decoration: lyrics.link.isEmpty ? null : TextDecoration.underline,
+          decorationColor: Look.faint,
+        ));
+    if (lyrics.link.isEmpty) return line;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: () => MixtapeNative.openUrl(lyrics.link),
+      child: Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: line),
     );
   }
 }

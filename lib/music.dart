@@ -711,9 +711,6 @@ List<Mood> parseMoods(Map<String, Object?> data) {
 
 List<Shelf> parseShelves(Map<String, Object?> data) => _shelvesIn(data['contents'] ?? data);
 
-String _videoType(Map<String, Object?> item) =>
-    '${findOne(item['navigationEndpoint'], 'watchEndpointMusicConfig')['musicVideoType'] ?? ''}';
-
 /// A radio's songs as they should play: where YouTube Music puts a song next to a music video, the song
 /// (no intro, no skit, the album's sound); uploads of other people and podcast episodes stay out (only
 /// the song the radio started from stays, whatever it is).

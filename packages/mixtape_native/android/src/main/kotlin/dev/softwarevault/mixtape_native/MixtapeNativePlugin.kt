@@ -184,6 +184,20 @@ class MixtapeNativePlugin : FlutterPlugin, MethodChannel.MethodCallHandler, Acti
                 }
                 result.success(null)
             }
+            "openUrl" -> {
+                // a page in the browser (where some lyrics came from)
+                val url = call.argument<String>("url") ?: ""
+                if (!url.startsWith("https://")) {
+                    result.success(false)
+                } else {
+                    try {
+                        context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                        result.success(true)
+                    } catch (e: android.content.ActivityNotFoundException) {
+                        result.success(false) // no browser on the phone
+                    }
+                }
+            }
             "shareImage" -> result.success(shareFile(call.argument<String>("path") ?: "", "image/png", call.argument<String>("text")))
             "shareFile" -> result.success(
                 shareFile(call.argument<String>("path") ?: "", call.argument<String>("mime") ?: "application/octet-stream", call.argument<String>("text"))

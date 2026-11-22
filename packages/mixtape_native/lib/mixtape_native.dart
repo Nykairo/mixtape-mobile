@@ -106,6 +106,17 @@ class MixtapeNative {
     }
   }
 
+  /// Opens a web page (https only) in the phone's browser. False where it couldn't.
+  static Future<bool> openUrl(String url) async {
+    try {
+      return await _channel.invokeMethod<bool>('openUrl', {'url': url}) ?? false;
+    } on MissingPluginException {
+      return false;
+    } on PlatformException {
+      return false;
+    }
+  }
+
   /// The screen stays on (a video over the whole screen) or goes back to turning off by itself.
   static Future<void> keepAwake(bool on) async {
     try {
