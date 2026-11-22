@@ -1,0 +1,34 @@
+
+::group::✅ Passing tests
+✅ Home
+✅ Search
+✅ Artist and album
+✅ Library
+✅ Tapes
+✅ Menus and the tape studio
+✅ Stats and Rewind
+✅ Settings and signing in
+✅ Together
+✅ Profiles
+✅ Together, signed out
+✅ Samples
+✅ The player
+✅ The player's sheets
+::endgroup::
+::group::✅ (tearDownAll)
+12 problems on pixel_8
+  album_2: "Random Access Memories is the …" lies on ""
+  album_2: "Random Access Memories is the …" lies on "Home"
+  album_2: "Random Access Memories is the …" lies on ""
+  album_2: "Random Access Memories is the …" lies on "Samples"
+  album_2: "Random Access Memories is the …" lies on "󰄽"
+  album_2: "Random Access Memories is the …" lies on "Search"
+  album_2: "Random Access Memories is the …" lies on ""
+  album_2: "Random Access Memories is the …" lies on "Library"
+  album_2: buttons "" and "4" lie on each other
+  album_2: buttons "" and "4" lie on each other
+  album_2: buttons "" and "4" lie on each other
+  album_2: buttons "" and "4" lie on each other
+::endgroup::
+
+🎉 14 tests passed.
