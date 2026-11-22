@@ -1,3 +1,14 @@
+**New in 0.3.3**
+
+- Songs start much sooner: the quick way asks first, and on Android NewPipe only steps in when that is slow or goes wrong. The first song after a restart plays at once, and a finger on a song looks it up before the tap is through.
+- Lyrics from more places: lrclib's free-text search, Megalobiz (the line under the words links to its page), NetEase, KuGou and QQ Music.
+- Music videos found for more songs: with no music video, the artist's lyric video or visualizer, then youtube.com itself (the artist's channel or their VEVO).
+- Radios and the songs after the queue are songs, not videos: the song in place of its music video, and no uploads of other people or podcast episodes.
+- A Downloads page: the song coming down with how far it is, the ones waiting (any can go first or stay off), and the ones that wouldn't come, to try again. A bar at the top of the library opens it.
+- Every artist's name opens the artist, and play counts ("1,2 Mio. Wiedergaben") no longer turn up as artist names in tapes, stats and Rewind.
+- The crossfade slider no longer lags while you drag it.
+- Rewind: the top artist's photo, and long titles end in dots instead of being cut off.
+
 **New in 0.3.2**
 
 - The music video over the whole screen: the key in its corner turns the phone on its side, with the song's keys over it for a tap and a double tap on either side to jump 10 seconds. The screen stays on meanwhile.

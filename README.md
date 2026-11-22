@@ -33,17 +33,20 @@ With a free Apple ID the signature lasts seven days, and AltStore or SideStore r
 - **Search** that finds things: words offered while you type, what you searched before, a top result,
   filters for songs, videos, albums, artists and playlists, and pages for every artist and album.
 - **The player**: the song, its tape or its music video (lined up with the song by YouTube's "most
-  replayed" curve, and over the whole screen with the phone on its side), lyrics that scroll along (tap a line to jump there, a little clock counts down to
-  the next one, Translate puts them into your language), what comes next, related songs, a sleep timer
-  (in minutes or at the end of the song) and the speed. Swipe the little player for the next song, and
-  save the queue as a tape.
+  replayed" curve, and over the whole screen with the phone on its side; with no music video, the
+  artist's lyric video or visualizer), lyrics that scroll along (from lrclib, YouTube Music,
+  Megalobiz, NetEase, KuGou or QQ Music; tap a line to jump there, a little clock counts down to the
+  next one, Translate puts them into your language), what comes next, related songs, a sleep timer (in
+  minutes or at the end of the song) and the speed. Swipe the little player for the next song, and save
+  the queue as a tape. Every artist's name opens the artist.
 - **Between songs**: a crossfade in the computer's four shapes (smooth, linear, DJ, gentle), albums
-  that play straight through, and a radio that keeps going with songs like the last ones. Every song
-  has "Songs like this" and a radio, every artist a radio and Samples.
+  that play straight through, and a radio that keeps going with songs like the last ones (the songs,
+  not their videos). Every song has "Songs like this" and a radio, every artist a radio and Samples.
 - **Samples**: one song at a time on the whole screen, from its best half minute; then the next one
   comes by itself and the two run into each other, or you flick on sooner. Like it, put it on a tape,
   play it whole or say it's not for you. The music that was on waits and carries on after.
-- **On the phone**: save a whole tape, an album or a single song for when there's no internet.
+- **On the phone**: save a whole tape, an album or a single song for when there's no internet. The
+  Downloads page shows the song coming down, the ones waiting their turn and any that wouldn't come;
   Settings show how much room they take.
 - **Together**: listen along with a friend by their user name, open a room with one queue for everybody,
   or throw a party where the guests ask for songs and the host picks. These are the same rooms as on
