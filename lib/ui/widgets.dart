@@ -374,9 +374,7 @@ Future<void> songMenu(BuildContext context, Track t, {Tape? tape, int? index}) {
               if (artistId.isNotEmpty || t.artist.isNotEmpty)
                 _MenuRow(Icons.person_outline_rounded, 'Go to ${t.artist.split(',').first}', () {
                   Navigator.of(sheet).pop();
-                  Shell.push(artistId.isNotEmpty
-                      ? ArtistView(id: artistId, name: t.artist.split(',').first)
-                      : SearchResultsView(query: t.artist.split(',').first, filter: 'artists'));
+                  openArtist(t.artist, id: artistId);
                 }),
               if (albumId.isNotEmpty)
                 _MenuRow(Icons.album_outlined, 'Go to the album', () {

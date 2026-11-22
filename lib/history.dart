@@ -10,6 +10,7 @@ import 'package:flutter/foundation.dart';
 
 import 'model.dart';
 import 'store.dart';
+import 'yt_words.dart';
 
 const _file = 'plays.json';
 const _most = 20000;
@@ -42,7 +43,7 @@ class Play {
       src: j['s'] as String,
       ref: j['r'] as String,
       title: '${j['t'] ?? ''}',
-      artist: '${j['a'] ?? ''}',
+      artist: artistOrNothing('${j['a'] ?? ''}'),
       art: '${j['i'] ?? ''}',
       dur: j['d'] is int ? j['d'] as int : 0,
     );
@@ -160,8 +161,25 @@ class History extends ChangeNotifier {
   void heard(Track t, int seconds, DateTime started) {
     final enough = min(30, t.dur > 0 ? max(10, t.dur ~/ 2) : 30);
     if (seconds < enough || t.src == 'local') return;
-    plays.add(Play(t, started.millisecondsSinceEpoch ~/ 1000, seconds));
+    // a song from elsewhere (a friend's, a room's) with a count where its artist belongs: mend.dart finds it
+    final song = looksLikeCount(t.artist) ? t.withArtist('') : t;
+    plays.add(Play(song, started.millisecondsSinceEpoch ~/ 1000, seconds));
     if (plays.length > _most) plays.removeRange(0, plays.length - _most);
+    _save.soon();
+    notifyListeners();
+  }
+
+  /// Plays of songs that had lost their artist get it back (see mend.dart): [found] by the song's id.
+  void giveArtists(Map<String, Track> found) {
+    var any = false;
+    for (var k = 0; k < plays.length; k++) {
+      final p = plays[k];
+      final f = found[p.track.id];
+      if (f == null || p.track.artist.isNotEmpty) continue;
+      plays[k] = Play(p.track.withArtist(f.artist), p.at, p.seconds);
+      any = true;
+    }
+    if (!any) return;
     _save.soon();
     notifyListeners();
   }

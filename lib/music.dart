@@ -8,6 +8,7 @@ import 'innertube.dart';
 import 'jsonwalk.dart';
 import 'model.dart';
 import 'youtube.dart';
+import 'yt_words.dart';
 
 enum Kind { song, video, album, artist, playlist, other }
 
@@ -215,6 +216,32 @@ class Music {
   static Future<ArtistPage> artist(String id) =>
       _kept('a:$id', const Duration(minutes: 30), () async => parseArtist(await _yt.browseRaw(id), id));
 
+  static final _named = <String, Future<Item?>>{};
+
+  /// The artist YouTube Music knows by this name (a name from a tape, the stats or Rewind, where no
+  /// id came along): the one called exactly that among the artists a search finds, or else the first.
+  /// Null when there's none. Asked once per name while the app runs.
+  static Future<Item?> artistNamed(String name) {
+    final key = name.trim().toLowerCase();
+    if (key.isEmpty) return Future.value();
+    return _named[key] ??= () async {
+      try {
+        final r = await search(name.trim(), filter: 'artists');
+        final artists = [
+          for (final i in [if (r.top != null) r.top!, ...r.items])
+            if (i.kind == Kind.artist && i.id.isNotEmpty) i,
+        ];
+        for (final a in artists) {
+          if (a.title.trim().toLowerCase() == key) return a;
+        }
+        return artists.isEmpty ? null : artists.first;
+      } on Object {
+        _named.remove(key); // asked again next time: it may have been the connection
+        rethrow;
+      }
+    }();
+  }
+
   /// An album (MPREb...) or a playlist (VL..., or a bare PL..., OLAK..., RD...).
   static Future<ListPage> list(String id) {
     final browse = id.startsWith('MPRE') || id.startsWith('VL') || id.startsWith('FE') ? id : 'VL$id';
@@ -248,18 +275,14 @@ class Music {
 
 // ---------------------------------------------------------------- reading the answers
 
-const _typeWords = {
-  'Song': Kind.song,
-  'Video': Kind.video,
-  'Album': Kind.album,
-  'Single': Kind.album,
-  'EP': Kind.album,
-  'Artist': Kind.artist,
-  'Playlist': Kind.playlist,
-  'Episode': Kind.other,
-  'Podcast': Kind.other,
-  'Profile': Kind.other,
-  'Station': Kind.other,
+/// What the word in front of a row says it is (yt_words.dart has the words, in every language).
+const _kinds = {
+  'song': Kind.song,
+  'video': Kind.video,
+  'album': Kind.album,
+  'artist': Kind.artist,
+  'playlist': Kind.playlist,
+  'other': Kind.other,
 };
 
 Kind _pageKind(String pageType) => switch (pageType) {
@@ -283,13 +306,6 @@ _Run _run(Map<String, Object?> r) {
   return ('${r['text'] ?? ''}', '${browse['browseId'] ?? ''}', type);
 }
 
-double _count(String text) {
-  final m = RegExp(r'([\d.,]+)\s*([KMB]?)', caseSensitive: false).firstMatch(text);
-  if (m == null) return 0;
-  final n = double.tryParse(m.group(1)!.replaceAll(',', '')) ?? 0;
-  return n * (const {'': 1, 'K': 1e3, 'M': 1e6, 'B': 1e9}[m.group(2)!.toUpperCase()] ?? 1);
-}
-
 String _videoType(Object? node) => '${findOne(node, 'watchEndpointMusicConfig')['musicVideoType'] ?? ''}';
 
 /// What the parts of a subtitle say: the artists (linked or the first plain part), the album, a year,
@@ -297,7 +313,7 @@ String _videoType(Object? node) => '${findOne(node, 'watchEndpointMusicConfig')[
 class _Parts {
   _Parts(List<_Run> runs, {bool firstIsArtist = true}) {
     final words = runs.map((r) => r.$1).join().split(' • ').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-    if (words.isNotEmpty && _typeWords.containsKey(words.first)) type = _typeWords[words.first];
+    if (words.isNotEmpty) type = _kinds[kindWords[words.first]];
     for (final r in runs) {
       if (r.$3 == 'MUSIC_PAGE_TYPE_ARTIST' || r.$3 == 'MUSIC_PAGE_TYPE_USER_CHANNEL') {
         if (artist.isEmpty) artistId = r.$2;
@@ -312,15 +328,26 @@ class _Parts {
         dur = clockSeconds(w);
       } else if (RegExp(r'^\d{4}$').hasMatch(w)) {
         year = w;
-      } else if (RegExp(r'\b(views|plays|listeners|monthly audience)$').hasMatch(w)) {
-        views = _count(w);
+      } else if (looksLikeCount(w)) {
+        views = countValue(w);
       }
     }
     if (artists.isEmpty && firstIsArtist) {
-      final plain = words.where((w) => !_typeWords.containsKey(w) && !isClock(w) && !RegExp(r'^\d{4}$').hasMatch(w));
-      if (plain.isNotEmpty && !RegExp(r'\b(views|plays)$').hasMatch(plain.first)) artists.add(plain.first);
+      // the first part that is none of the others: no kind, length, year, count, or album (a row on an
+      // artist's page or an album's often leaves the artist out, and then the album comes first)
+      final elsewhere = {
+        for (final r in runs)
+          if (r.$2.isNotEmpty) r.$1.trim(),
+      };
+      final plain = words.where((w) =>
+          !kindWords.containsKey(w) &&
+          !isClock(w) &&
+          !RegExp(r'^\d{4}$').hasMatch(w) &&
+          !looksLikeCount(w) &&
+          !elsewhere.contains(w));
+      if (plain.isNotEmpty) artists.add(plain.first);
     }
-    shown = words.where((w) => !_typeWords.containsKey(w) || words.length == 1).join(' • ');
+    shown = words.where((w) => !kindWords.containsKey(w) || words.length == 1).join(' • ');
   }
 
   Kind? type;

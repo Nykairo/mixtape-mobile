@@ -11,6 +11,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 
 import 'jsonwalk.dart';
+import 'yt_words.dart';
 
 /// Why something didn't work: the same short words the Android side uses (age, region, private,
 /// members, busy, gone, network, trouble).
@@ -297,20 +298,18 @@ class InnerTube {
     final id = _videoId(item);
     if (id == null) return null;
     final columns = asList(item['flexColumns']);
-    String text(int k) =>
-        k < columns.length ? textOf(asMap(asMap(columns[k])['musicResponsiveListItemFlexColumnRenderer'])['text']) : '';
-    final title = text(0);
+    Object? column(int k) =>
+        k < columns.length ? asMap(asMap(columns[k])['musicResponsiveListItemFlexColumnRenderer'])['text'] : null;
+    final title = textOf(column(0));
     if (title.isEmpty) return null;
     // the second line: artists • album • 3:45 (the parts between the dots)
-    final parts = text(1).split(' • ').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
-    final dur = parts.isNotEmpty && isClock(parts.last) ? clockSeconds(parts.removeLast()) : 0;
-    if (parts.isNotEmpty && const {'Song', 'Video', 'Episode'}.contains(parts.first)) parts.removeAt(0);
+    final parts = textOf(column(1)).split(' • ').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
     return {
       'id': id,
       'title': title,
-      'artist': parts.isNotEmpty ? parts.first : '',
+      'artist': artistIn(column(1)),
       'art': thumbOf(item['thumbnail']),
-      'dur': dur,
+      'dur': parts.isNotEmpty && isClock(parts.last) ? clockSeconds(parts.last) : 0,
     };
   }
 
@@ -318,15 +317,32 @@ class InnerTube {
   static Map<String, Object?>? panelItem(Map<String, Object?> item) {
     final id = item['videoId'];
     if (id is! String || id.isEmpty) return null;
-    final byline = textOf(item['longBylineText'] ?? item['shortBylineText']).split(' • ');
     final length = textOf(item['lengthText']);
     return {
       'id': id,
       'title': textOf(item['title']),
-      'artist': byline.isNotEmpty ? byline.first.trim() : '',
+      'artist': artistIn(item['longBylineText'] ?? item['shortBylineText']),
       'art': thumbOf(item['thumbnail']),
       'dur': isClock(length) ? clockSeconds(length) : 0,
     };
+  }
+
+  /// Who a line under a title names: the parts linked to an artist's page, or else the first part that
+  /// says nothing else (no "Song" in front, length, year or count of plays, in whatever language).
+  static String artistIn(Object? text) {
+    final linked = <String>[];
+    for (final r in asList(asMap(text)['runs'])) {
+      final page = findText(asMap(r)['navigationEndpoint'], 'pageType');
+      final name = '${asMap(r)['text'] ?? ''}'.trim();
+      if (name.isNotEmpty && (page == 'MUSIC_PAGE_TYPE_ARTIST' || page == 'MUSIC_PAGE_TYPE_USER_CHANNEL')) linked.add(name);
+    }
+    if (linked.isNotEmpty) return linked.join(', ');
+    for (final part in textOf(text).split(' • ')) {
+      final p = part.trim();
+      if (p.isEmpty || kindWords.containsKey(p) || isClock(p) || RegExp(r'^\d{4}$').hasMatch(p) || looksLikeCount(p)) continue;
+      return p;
+    }
+    return '';
   }
 
   static String? _videoId(Map<String, Object?> item) {

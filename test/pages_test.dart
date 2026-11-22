@@ -264,6 +264,12 @@ void main() {
     await tester.dragFrom(const Offset(206, 560), const Offset(0, -700));
     await wait(tester);
     await shot(tester, 'stats_further');
+    // an artist's name opens their page straight away, not a search for them
+    await tester.tap(find.text('Gabrielle').first);
+    await wait(tester);
+    expect(find.byType(ArtistView), findsOneWidget);
+    expect(find.byType(SearchResultsView), findsNothing);
+    expect(find.text('Top songs'), findsWidgets, reason: "the artist's page came in");
 
     unawaited(RewindPage.open(inside(tester), 'year'));
     await wait(tester);

@@ -147,6 +147,26 @@ class Library extends ChangeNotifier {
     await _saveSync.now();
   }
 
+  /// Songs that had lost their artist get it back (see mend.dart), [found] by the song's id, wherever
+  /// they are: liked, lately played, hidden and on tapes (which then go to the account, mended there too).
+  void giveArtists(Map<String, Track> found) {
+    var any = false;
+    Track fix(Track t) {
+      final f = found[t.id];
+      if (f == null || t.artist.isNotEmpty) return t;
+      any = true;
+      return t.withArtist(f.artist, artistId: '${f.extra['artist_id'] ?? ''}');
+    }
+
+    for (final list in [liked, recent, for (final tape in tapes.values) tape.songs]) {
+      for (var k = 0; k < list.length; k++) {
+        list[k] = fix(list[k]);
+      }
+    }
+    hidden.updateAll((_, t) => fix(t));
+    if (any) _changed();
+  }
+
   // ------------------------------------------------------------ liked songs
 
   bool isLiked(Track t) => _likedIds.contains(t.id);

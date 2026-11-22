@@ -360,7 +360,7 @@ class ProfileCard extends StatelessWidget {
                   onPressed: () {
                     // back down to the tabs first, wherever the profile was opened from
                     Navigator.of(context, rootNavigator: true).popUntil((r) => r.isFirst);
-                    Shell.push(SearchResultsView(query: a, filter: 'artists'));
+                    openArtist(a);
                   },
                 ),
             ]),

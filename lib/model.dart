@@ -5,6 +5,8 @@ library;
 import 'dart:convert';
 import 'dart:typed_data';
 
+import 'yt_words.dart';
+
 /// A song. [id] is the source plus its reference ('yt' + the YouTube video id), [ref] the reference
 /// alone, [dur] its length in seconds. Songs from YouTube and podcast episodes (their [ref] is the
 /// episode's own address) play here; songs from a computer's music folder and SoundCloud only show.
@@ -45,7 +47,7 @@ class Track {
         src: 'yt',
         ref: '${m['id'] ?? ''}',
         title: '${m['title'] ?? ''}',
-        artist: '${m['artist'] ?? ''}',
+        artist: artistOrNothing('${m['artist'] ?? ''}'),
         art: '${m['art'] ?? ''}',
         dur: _int(m['dur']),
       );
@@ -64,7 +66,9 @@ class Track {
       src: src,
       ref: '$ref',
       title: '${j['title'] ?? ''}',
-      artist: '${j['artist'] ?? ''}',
+      // a count of plays where the artist belongs (YouTube in another language than the app could read,
+      // before 0.3.3) goes: the songs get their artist back in the background (mend.dart)
+      artist: artistOrNothing('${j['artist'] ?? ''}'),
       art: '${j['art'] ?? ''}',
       dur: _int(j['dur']),
       extra: extra,
@@ -75,6 +79,17 @@ class Track {
 
   Map<String, Object?> toJson() =>
       {...extra, 'id': id, 'src': src, 'ref': ref, 'title': title, 'artist': artist, 'art': art, 'dur': dur};
+
+  /// The same song by [artist], and with the artist's page when [artistId] says which.
+  Track withArtist(String artist, {String artistId = ''}) => Track(
+        src: src,
+        ref: ref,
+        title: title,
+        artist: artist,
+        art: art,
+        dur: dur,
+        extra: artistId.isEmpty ? extra : {...extra, 'artist_id': artistId},
+      );
 
   /// The cover at a size that suits the phone: YouTube Music's pictures come in any size asked for.
   String artAt(int px) {

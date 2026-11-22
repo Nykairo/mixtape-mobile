@@ -17,6 +17,7 @@ import 'history.dart';
 import 'home_widgets.dart';
 import 'library.dart';
 import 'look.dart';
+import 'mend.dart';
 import 'phone.dart';
 import 'scrobble.dart';
 import 'settings.dart';
@@ -106,6 +107,7 @@ Future<void> main() async {
   runApp(const MixtapeApp());
   HomeWidgets.start();
   if (account.signedIn) library.sync();
+  Mend.soon(); // songs that lost their artist get it back, a while after the start
 }
 
 class MixtapeApp extends StatefulWidget {

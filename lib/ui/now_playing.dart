@@ -173,11 +173,7 @@ class _NowPlayingState extends State<NowPlaying> {
                 Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(23, weight: FontWeight.w800, height: 1.2)),
                 const SizedBox(height: 2),
                 InkWell(
-                  onTap: () {
-                    final id = '${t.extra['artist_id'] ?? ''}';
-                    final name = t.artist.split(',').first;
-                    Shell.push(id.isNotEmpty ? ArtistView(id: id, name: name) : SearchResultsView(query: name, filter: 'artists'));
-                  },
+                  onTap: () => openArtist(t.artist, id: '${t.extra['artist_id'] ?? ''}'),
                   child: Text(t.artist, maxLines: 1, overflow: TextOverflow.ellipsis,
                       style: Look.ui(16, color: Look.cream.withValues(alpha: 0.72))),
                 ),

@@ -14,6 +14,7 @@ import '../app.dart';
 import '../history.dart';
 import '../look.dart';
 import '../model.dart';
+import '../music.dart';
 import '../store.dart';
 import 'pages.dart';
 import 'shell.dart';
@@ -249,7 +250,7 @@ class _ArtistBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => Shell.push(SearchResultsView(query: name, filter: 'artists')),
+      onTap: () => openArtist(name),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
         child: Row(children: [
@@ -439,12 +440,19 @@ class _RewindPageState extends State<RewindPage> with SingleTickerProviderStateM
         _Card(colors: const [Color(0xFF7A3B62), Look.bg], children: [
           Text('Your top artist', style: Look.ui(20, weight: FontWeight.w700)),
           const SizedBox(height: 18),
-          Text(artists.first.$1, textAlign: TextAlign.center, style: Look.ui(44, weight: FontWeight.w900, height: 1.05)),
+          _ArtistPhoto(artists.first.$1),
+          const SizedBox(height: 18),
+          Text(artists.first.$1,
+              textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: Look.ui(artists.first.$1.length > 18 ? 34 : 44, weight: FontWeight.w900, height: 1.05)),
           const SizedBox(height: 12),
           Text('${artists.first.$2} minutes together', style: Look.ui(17, color: Look.cream.withValues(alpha: 0.8))),
           const SizedBox(height: 26),
           for (var k = 1; k < min(5, artists.length); k++)
-            Text('${k + 1}.  ${artists[k].$1}', style: Look.ui(17, weight: FontWeight.w600)),
+            Text('${k + 1}.  ${artists[k].$1}',
+                maxLines: 1, overflow: TextOverflow.ellipsis, style: Look.ui(17, weight: FontWeight.w600)),
         ]),
       if (_new.isNotEmpty)
         _Card(colors: const [Color(0xFF8C4A1E), Look.bg], children: [
@@ -454,7 +462,11 @@ class _RewindPageState extends State<RewindPage> with SingleTickerProviderStateM
           for (final name in _new.take(5))
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Text(name, textAlign: TextAlign.center, style: Look.ui(19, weight: FontWeight.w700)),
+              child: Text(name,
+                  textAlign: TextAlign.center,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Look.ui(19, weight: FontWeight.w700)),
             ),
           if (_new.length > 5)
             Padding(
@@ -468,8 +480,17 @@ class _RewindPageState extends State<RewindPage> with SingleTickerProviderStateM
           const SizedBox(height: 18),
           Cover(songs.first.$1, size: 200, radius: 12),
           const SizedBox(height: 18),
-          Text(songs.first.$1.title, textAlign: TextAlign.center, maxLines: 2, style: Look.ui(28, weight: FontWeight.w900)),
-          Text(songs.first.$1.artist, style: Look.ui(17, color: Look.cream.withValues(alpha: 0.8))),
+          Text(songs.first.$1.title,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Look.ui(28, weight: FontWeight.w900, height: 1.15)),
+          const SizedBox(height: 4),
+          Text(songs.first.$1.artist,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Look.ui(17, color: Look.cream.withValues(alpha: 0.8))),
           const SizedBox(height: 10),
           Text('played ${songs.first.$2} times', style: Look.hand(28, color: Look.cream)),
         ]),
@@ -651,6 +672,50 @@ class _RewindPageState extends State<RewindPage> with SingleTickerProviderStateM
             ),
           ),
         ]),
+      ),
+    );
+  }
+}
+
+/// An artist's photo in a circle, found by their name; their initial while it comes, or when YouTube
+/// Music has none.
+class _ArtistPhoto extends StatefulWidget {
+  const _ArtistPhoto(this.name);
+
+  final String name;
+
+  @override
+  State<_ArtistPhoto> createState() => _ArtistPhotoState();
+}
+
+class _ArtistPhotoState extends State<_ArtistPhoto> {
+  late final Future<Item?> _found = Music.artistNamed(widget.name).then<Item?>((a) => a, onError: (Object _) => null);
+
+  @override
+  Widget build(BuildContext context) {
+    const size = 168.0;
+    final initial = widget.name.isEmpty ? '?' : String.fromCharCode(widget.name.runes.first).toUpperCase();
+    return Container(
+      width: size + 8,
+      height: size + 8,
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: SweepGradient(colors: [...Look.stripes, Look.stripes.first]),
+        boxShadow: const [BoxShadow(color: Color(0x66000000), blurRadius: 24, offset: Offset(0, 10))],
+      ),
+      child: FutureBuilder<Item?>(
+        future: _found,
+        builder: (context, snap) {
+          final art = (snap.data?.art ?? '').replaceFirst(RegExp(r'=w\d+-h\d+'), '=w544-h544');
+          return art.isEmpty
+              ? Container(
+                  decoration: const BoxDecoration(shape: BoxShape.circle, color: Look.bg),
+                  alignment: Alignment.center,
+                  child: Text(initial, style: Look.hand(78, color: Look.cream)),
+                )
+              : Pic(art, size: size, round: true, icon: Icons.person_rounded);
+        },
       ),
     );
   }

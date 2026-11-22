@@ -7,6 +7,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 import '../app.dart';
+import '../history.dart' show firstArtist;
 import '../look.dart';
 import '../model.dart';
 import '../music.dart';
@@ -111,8 +112,23 @@ Widget _failed(String text, VoidCallback again) => Padding(
 
 const _offline = "YouTube Music didn't answer. Check the internet connection.";
 
+/// No artist by that name on YouTube Music: the search for it instead.
+Widget _notFound(String name) => Padding(
+      padding: const EdgeInsets.all(32),
+      child: Column(children: [
+        Text("YouTube Music has no artist page called $name.",
+            textAlign: TextAlign.center, style: Look.ui(15, color: Look.muted, height: 1.4)),
+        const SizedBox(height: 14),
+        OutlinedButton(
+          onPressed: () => Shell.push(SearchResultsView(query: name)),
+          child: Text('Search for $name', maxLines: 1, overflow: TextOverflow.ellipsis),
+        ),
+      ]),
+    );
+
 // ---------------------------------------------------------------- an artist
 
+/// An artist's page. Opened with only a name (an [id] of ''), the artist is looked up by it on the way.
 class ArtistView extends StatefulWidget {
   const ArtistView({super.key, required this.id, this.name = ''});
 
@@ -123,9 +139,28 @@ class ArtistView extends StatefulWidget {
   State<ArtistView> createState() => _ArtistViewState();
 }
 
+/// Opens the page of an artist named on a song, a tape or in the stats: at once by [id] when it came
+/// along, else by the first of the names ("A, B & C" opens A).
+void openArtist(String name, {String id = ''}) {
+  final first = firstArtist(name);
+  if (id.isEmpty && first.isEmpty) return;
+  Shell.push(ArtistView(id: id, name: first));
+}
+
 class _ArtistViewState extends State<ArtistView> {
-  late Future<ArtistPage> _page = Music.artist(widget.id);
+  late Future<ArtistPage> _page = _load();
   bool _about = false;
+  bool _unknown = false; // YouTube Music knows no artist by the name
+
+  Future<ArtistPage> _load() async {
+    if (widget.id.isNotEmpty) return Music.artist(widget.id);
+    final found = await Music.artistNamed(widget.name);
+    if (found == null) {
+      if (mounted) setState(() => _unknown = true);
+      throw StateError('no artist named ${widget.name}');
+    }
+    return Music.artist(found.id);
+  }
 
   Future<void> _shuffle(ArtistPage a) async {
     var songs = a.songs;
@@ -161,7 +196,11 @@ class _ArtistViewState extends State<ArtistView> {
           if (a == null) {
             return Scaffold(
               appBar: AppBar(backgroundColor: Look.bg, title: Text(widget.name)),
-              body: snap.hasError ? _failed(_offline, () => setState(() => _page = Music.artist(widget.id))) : _loading(),
+              body: !snap.hasError
+                  ? _loading()
+                  : _unknown
+                      ? _notFound(widget.name)
+                      : _failed(_offline, () => setState(() => _page = _load())),
             );
           }
           return CustomScrollView(slivers: [
