@@ -109,13 +109,14 @@ bool looksLikeCount(String text) {
   for (final mark in _countMarks) {
     if (t.contains(mark)) return true;
   }
-  for (final word in t.split(_gaps)) {
-    if (_countWords.contains(_bare(word))) return true;
-  }
-  // a number and its size, and nothing after them: "1.2M", "1,2 Mio.", "4,5万"
+  // every language Mixtape speaks puts the number first (Korean has its mark above)
   final m = _number.firstMatch(t);
   if (m == null || m.start != 0) return false;
   final rest = t.substring(m.end).trim();
+  for (final word in rest.split(_gaps)) {
+    if (_countWords.contains(_bare(word))) return true;
+  }
+  // a number and its size, and nothing after them: "1.2M", "1,2 Mio.", "4,5万"
   final size = _sizeWord(rest);
   return size.isNotEmpty && _bare(rest.substring(rest.indexOf(size) + size.length)).isEmpty;
 }

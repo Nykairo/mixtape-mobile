@@ -55,6 +55,7 @@ void main() {
     for (final n in [
       '50 Cent', 'Blink-182', 'M83', '112', '2 Chainz', 'Sum 41', '21 Savage', 'The 1975', 'Daft Punk', '',
       '1K Phew', '5 Seconds of Summer', 'Maroon 5', '2Pac', 'UB40', '3 Doors Down', 'Mio', 'Views', '702',
+      'Plays 4 You', 'Club 8 Views',
     ]) {
       expect(looksLikeCount(n), isFalse, reason: n);
     }

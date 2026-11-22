@@ -116,7 +116,7 @@ const _offline = "YouTube Music didn't answer. Check the internet connection.";
 Widget _notFound(String name) => Padding(
       padding: const EdgeInsets.all(32),
       child: Column(children: [
-        Text("YouTube Music has no artist page called $name.",
+        Text('YouTube Music has no artist page called $name.',
             textAlign: TextAlign.center, style: Look.ui(15, color: Look.muted, height: 1.4)),
         const SizedBox(height: 14),
         OutlinedButton(
