@@ -33,6 +33,7 @@ class Downloads extends ChangeNotifier {
   final Map<String, SavedSong> _saved = {};
   final List<Track> _waiting = [];
   final Set<String> failed = {};
+  final Map<String, Track> _failedSongs = {};
 
   /// What a batch was called ("Road trip") and which of its songs are still to come, for the word at the end.
   final List<(String, Set<String>)> _batches = [];
@@ -42,6 +43,15 @@ class Downloads extends ChangeNotifier {
 
   Track? current;
   double progress = 0;
+
+  /// Of the song coming down now: how many bytes are here, of how many, and how fast they come (bytes a
+  /// second, smoothed).
+  int got = 0, size = 0;
+  double speed = 0;
+
+  /// Ticks a few times a second while a song comes down: for what shows how far it is. The rest of the
+  /// app listens to the downloads themselves, which only speak up when a song starts, ends or is lined up.
+  final ticks = ValueNotifier<int>(0);
   bool _running = false;
   bool _stop = false;
 
@@ -80,6 +90,46 @@ class Downloads extends ChangeNotifier {
   // ------------------------------------------------------------ asking
 
   bool has(Track t) => _saved.containsKey(t.id);
+
+  /// The songs waiting their turn, next one first (the one coming down now is [current]).
+  List<Track> get waiting => List.unmodifiable(_waiting);
+
+  /// Songs that wouldn't come, latest last: they can be tried again.
+  List<Track> get didntCome => _failedSongs.values.toList();
+
+  /// Whether anything is coming down or waiting to.
+  bool get busy => current != null || _waiting.isNotEmpty;
+
+  /// Puts a waiting song first in line.
+  void sooner(Track t) {
+    final k = _waiting.indexWhere((w) => w.id == t.id);
+    if (k <= 0) return;
+    _waiting.insert(0, _waiting.removeAt(k));
+    _save.soon();
+    notifyListeners();
+  }
+
+  /// Tries again the songs that wouldn't come.
+  int retry() {
+    final songs = didntCome;
+    _failedSongs.clear();
+    failed.clear();
+    return songs.isEmpty ? 0 : save(songs);
+  }
+
+  /// Forgets a song that wouldn't come.
+  void forget(Track t) {
+    if (_failedSongs.remove(t.id) == null) return;
+    failed.remove(t.id);
+    notifyListeners();
+  }
+
+  /// Forgets the songs that wouldn't come.
+  void forgetFailed() {
+    _failedSongs.clear();
+    failed.clear();
+    notifyListeners();
+  }
 
   bool isWaiting(Track t) => _waiting.any((w) => w.id == t.id) || current?.id == t.id;
 
@@ -131,6 +181,7 @@ class Downloads extends ChangeNotifier {
       if (t.src != 'yt' || _saved.containsKey(t.id) || isWaiting(t) || !ids.add(t.id)) continue;
       _waiting.add(t);
       failed.remove(t.id);
+      _failedSongs.remove(t.id);
     }
     if (ids.isEmpty) return 0;
     if (name.isNotEmpty) _batches.add((name, ids));
@@ -192,7 +243,10 @@ class Downloads extends ChangeNotifier {
         } on Object {
           ok = false;
         }
-        if (!ok && !_stop) failed.add(t.id);
+        if (!ok && !_stop) {
+          failed.add(t.id);
+          _failedSongs[t.id] = t;
+        }
         current = null;
         _done(t, ok);
         _save.soon();
@@ -215,22 +269,29 @@ class Downloads extends ChangeNotifier {
 
   Future<bool> _fetch(Track t) async {
     final source = YouTubeSource(t, _http);
-    final size = await source.size();
+    got = 0;
+    speed = 0;
+    size = await source.size();
     final link = await Links.get(t.ref);
     final ext = link.mime.contains('webm') ? 'webm' : 'm4a';
     final part = File('${_dir.path}/${t.id}.part');
     final sink = part.openWrite();
-    var got = 0;
     var told = DateTime.now();
+    var toldAt = 0;
     try {
       await for (final chunk in source.bytes(0, size, paced: false)) {
         if (_stop) break;
         sink.add(chunk);
         got += chunk.length;
         progress = size > 0 ? got / size : 0;
-        if (DateTime.now().difference(told) > const Duration(milliseconds: 250)) {
-          told = DateTime.now();
-          notifyListeners();
+        final now = DateTime.now();
+        final ms = now.difference(told).inMilliseconds;
+        if (ms > 250) {
+          final rate = (got - toldAt) * 1000 / ms;
+          speed = speed == 0 ? rate : speed * 0.7 + rate * 0.3;
+          told = now;
+          toldAt = got;
+          ticks.value++;
         }
       }
     } finally {

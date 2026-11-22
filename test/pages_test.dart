@@ -21,6 +21,7 @@ import 'package:mixtape/model.dart';
 import 'package:mixtape/rooms.dart' as rooms;
 import 'package:mixtape/store.dart';
 import 'package:mixtape/ui/add_music.dart';
+import 'package:mixtape/ui/downloads_page.dart';
 import 'package:mixtape/ui/full_video.dart';
 import 'package:mixtape/ui/keys.dart';
 import 'package:mixtape/ui/now_playing.dart';
@@ -306,6 +307,55 @@ void main() {
     await shot(tester, 'settings_further');
     await tester.scrollUntilVisible(find.text('Take one in'), 300, scrollable: list);
     expect(find.text('Save it to a file'), findsOneWidget);
+    await close(tester);
+  });
+
+  testWidgets('Downloads: the song coming down, the ones waiting, and the ones that would not come', (tester) async {
+    await pumpApp(tester);
+    final d = App.downloads;
+    DownloadsPage.open();
+    await wait(tester);
+    expect(find.textContaining('Nothing is coming down'), findsOneWidget);
+    expect(find.textContaining('5 songs'), findsOneWidget, reason: 'what is on the phone already');
+    await tester.pageBack();
+    await wait(tester);
+
+    // a song halfway down (as the page sees it), without the internet a test can't have
+    final coming = Box.songs[6];
+    d.current = coming;
+    d.size = 4200000;
+    d.got = 1890000;
+    d.progress = 0.45;
+    d.speed = 820000;
+    DownloadsPage.open();
+    await wait(tester);
+    expect(find.text('Coming down now'), findsOneWidget);
+    expect(find.text(coming.title), findsOneWidget);
+    expect(find.textContaining('1.8 MB of 4.0 MB'), findsOneWidget);
+    await shot(tester, 'downloads_now');
+    d.current = null;
+    await tester.pageBack();
+    await wait(tester);
+
+    // songs that can't come (no YouTube in a test) end up to be tried again
+    final songs = Box.songs.skip(7).take(3).toList();
+    await tester.runAsync(() async {
+      d.save(songs, name: 'Test');
+      for (var k = 0; k < 60 && d.busy; k++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+      }
+    });
+    expect(d.busy, isFalse);
+    expect(d.didntCome.map((t) => t.id), songs.map((t) => t.id));
+    DownloadsPage.open();
+    await wait(tester);
+    expect(find.text("Didn't come"), findsOneWidget);
+    expect(find.text('Try again'), findsOneWidget);
+    await shot(tester, 'downloads_failed');
+    await tester.tap(find.text('Forget them all'));
+    await wait(tester);
+    expect(d.didntCome, isEmpty);
+    expect(find.textContaining('Nothing is coming down'), findsOneWidget);
     await close(tester);
   });
 

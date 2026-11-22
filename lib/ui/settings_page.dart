@@ -13,6 +13,7 @@ import '../look.dart';
 import '../phone.dart';
 import '../scrobble.dart';
 import '../settings.dart';
+import 'downloads_page.dart';
 import 'pages.dart';
 import 'profile_page.dart';
 import 'shell.dart';
@@ -202,6 +203,17 @@ class SettingsPage extends StatelessWidget {
                         songs: [for (final x in App.downloads.all) x.track],
                         slot: 3,
                       )),
+            ),
+            ListTile(
+              leading: const Icon(Icons.downloading_rounded, color: Look.muted),
+              title: Text('Downloads', style: Look.ui(15.5)),
+              subtitle: Text(
+                App.downloads.busy
+                    ? '${App.downloads.waiting.length + 1} on their way'
+                    : "What's coming down, what's waiting, and what didn't come",
+                style: Look.ui(13, color: Look.muted, height: 1.35),
+              ),
+              onTap: DownloadsPage.open,
             ),
             if (saved > 0)
               ListTile(

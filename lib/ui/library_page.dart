@@ -9,6 +9,7 @@ import '../app.dart';
 import '../look.dart';
 import '../model.dart';
 import 'add_music.dart';
+import 'downloads_page.dart';
 import 'shell.dart';
 import 'sign_in.dart';
 import 'tape_page.dart';
@@ -173,6 +174,7 @@ class _LibraryPageState extends State<LibraryPage> {
                   ),
                 ),
               ),
+              if (d.busy) const SliverToBoxAdapter(child: DownloadsBar()),
               if (s == null || lib.trouble != null) const SliverToBoxAdapter(child: _AccountCard()),
               SliverToBoxAdapter(
                 child: Padding(
